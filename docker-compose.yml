@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pushup-tracker-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - /volume1/docker/pushup-tracker/data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - TZ=America/Chicago
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/statistics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend (built and served by nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pushup-tracker-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    environment:
+      - TZ=America/Chicago

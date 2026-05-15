@@ -1,0 +1,16 @@
+{
+  "name": "pushup-tracker",
+  "version": "1.0.0",
+  "description": "Pushup Tracker - Full Stack Application",
+  "scripts": {
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "test": "cd backend && npm test",
+    "test:e2e": "cd frontend && npx playwright test"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

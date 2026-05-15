@@ -1,0 +1,262 @@
+
+> backend@1.0.0 test
+> jest --coverage --detectOpenHandles --forceExit
+
+FAIL tests/api.test.js
+  API Endpoints
+    POST /api/pushups
+      Valid Requests
+        ΓêÜ should log pushups with valid count (90 ms)
+        ΓêÜ should log minimum count of 1 (25 ms)
+        ΓêÜ should log maximum count of 1000 (22 ms)
+        ΓêÜ should accept count as string number (25 ms)
+        ΓêÜ should persist multiple entries (67 ms)
+      Invalid Requests
+        ΓêÜ should reject missing count (15 ms)
+        ΓêÜ should reject null count (18 ms)
+        ΓêÜ should reject count of 0 (13 ms)
+        ΓêÜ should reject negative count (16 ms)
+        ΓêÜ should reject count > 1000 (15 ms)
+        ΓêÜ should reject non-integer count (14 ms)
+        ΓêÜ should reject non-numeric count (14 ms)
+        ΓêÜ should reject empty string count (18 ms)
+        ΓêÜ should handle array count (coerced to string) (26 ms)
+        ΓêÜ should reject object count (17 ms)
+    GET /api/statistics
+      ΓêÜ should return all statistics fields (19 ms)
+      ΓêÜ should return zeros for empty database (17 ms)
+      ΓêÜ should reflect newly logged pushups (34 ms)
+      ├ù should calculate daily total correctly (71 ms)
+      ΓêÜ should calculate averages correctly (36 ms)
+      ΓêÜ should return correct all-time stats (35 ms)
+    GET /api/history
+      ΓêÜ should return empty array for empty database (16 ms)
+      ΓêÜ should default to 90 days (28 ms)
+      ΓêÜ should respect days parameter (24 ms)
+      ΓêÜ should return grouped totals by date (25 ms)
+      ΓêÜ should accept boundary values (27 ms)
+      Invalid days parameter
+        ΓêÜ should reject non-numeric days (16 ms)
+        ΓêÜ should reject negative days (14 ms)
+        ΓêÜ should reject zero days (14 ms)
+        ΓêÜ should reject days > 365 (18 ms)
+        ΓêÜ should reject floating point days (16 ms)
+    Content-Type Handling
+      ΓêÜ should accept application/json (28 ms)
+      ΓêÜ should return JSON responses (22 ms)
+    Error Handling
+      ΓêÜ should handle malformed JSON gracefully (18 ms)
+    Data Consistency
+      ΓêÜ logged pushups should appear in statistics (66 ms)
+      ΓêÜ logged pushups should appear in history (33 ms)
+      ΓêÜ statistics and history should be consistent (47 ms)
+
+  ΓùÅ API Endpoints ΓÇ║ GET /api/statistics ΓÇ║ should calculate daily total correctly
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 60
+    Received: 10
+
+      250 |         .expect(200);
+      251 |
+    > 252 |       expect(response.body.dailyTotal.total).toBe(60);
+          |                                              ^
+      253 |     });
+      254 |
+      255 |     test('should calculate averages correctly', async () => {
+
+      at Object.toBe (tests/api.test.js:252:46)
+
+FAIL tests/validation.test.js
+  Controller Validation
+    Count Validation
+      Type Coercion
+        ΓêÜ should accept integer strings (43 ms)
+        ΓêÜ should reject floating point strings (19 ms)
+        ΓêÜ should accept strings with spaces (trimmed by Number()) (23 ms)
+        ΓêÜ should reject mixed alphanumeric (19 ms)
+        ├ù should coerce boolean true to 1 (22 ms)
+        ΓêÜ should reject boolean false (coerces to 0) (17 ms)
+        ΓêÜ should reject undefined (16 ms)
+      Boundary Values
+        ΓêÜ should accept count = 1 (minimum) (23 ms)
+        ΓêÜ should accept count = 1000 (maximum) (19 ms)
+        ΓêÜ should reject count = 0 (14 ms)
+        ΓêÜ should reject count = 1001 (17 ms)
+        ΓêÜ should reject count = -1 (18 ms)
+      Special Values
+        ΓêÜ should reject Infinity (20 ms)
+        ΓêÜ should reject NaN (18 ms)
+        ΓêÜ should reject very large numbers (17 ms)
+    Days Validation
+      Valid Values
+        ΓêÜ should accept days = 1 (22 ms)
+        ΓêÜ should accept days = 365 (20 ms)
+        ΓêÜ should accept days = 30 (16 ms)
+        ΓêÜ should default to 90 when days is empty (16 ms)
+        ΓêÜ should default to 90 when days is missing (15 ms)
+      Invalid Values
+        ΓêÜ should reject days = 0 (16 ms)
+        ΓêÜ should reject days = -1 (16 ms)
+        ΓêÜ should reject days = 366 (15 ms)
+        ΓêÜ should reject days = 7.5 (14 ms)
+        ΓêÜ should reject days = "abc" (18 ms)
+    Error Response Format
+      ΓêÜ should include error message (16 ms)
+      ΓêÜ should include status code (16 ms)
+      ΓêÜ should include details when available (17 ms)
+
+  ΓùÅ Controller Validation ΓÇ║ Count Validation ΓÇ║ Type Coercion ΓÇ║ should coerce boolean true to 1
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 1
+    Received: NaN
+
+      77 |           .send({ count: true })
+      78 |           .expect(201);
+    > 79 |         expect(parseInt(response.body.count, 10)).toBe(1);
+         |                                                   ^
+      80 |       });
+      81 |
+      82 |       test('should reject boolean false (coerces to 0)', async () => {
+
+      at Object.toBe (tests/validation.test.js:79:51)
+
+FAIL tests/model.test.js
+  Database Model
+    logPushup
+      ΓêÜ should log a valid pushup entry (11 ms)
+      ΓêÜ should auto-increment IDs (19 ms)
+      ΓêÜ should persist data to database (11 ms)
+      ΓêÜ should store multiple entries correctly (23 ms)
+      ΓêÜ should handle large counts (10 ms)
+      ΓêÜ should handle minimum count of 1 (13 ms)
+    getDailyTotal
+      ├ù should return 0 for empty database (12 ms)
+      ├ù should calculate daily total correctly (23 ms)
+      ΓêÜ should not include entries from other days (33 ms)
+      ΓêÜ should return pushup details with timestamps (17 ms)
+    get7DayAverage
+      ΓêÜ should return 0 for empty database (8 ms)
+      ΓêÜ should calculate average for single day (11 ms)
+      ΓêÜ should calculate average across multiple days (22 ms)
+      ΓêÜ should not include entries older than 7 days (15 ms)
+      ΓêÜ should handle multiple entries per day (21 ms)
+    get30DayAverage
+      ΓêÜ should return 0 for empty database (7 ms)
+      ΓêÜ should include entries within 30 days (20 ms)
+      ΓêÜ should not include entries older than 30 days (18 ms)
+    getStreak
+      ΓêÜ should return 0 for empty database (6 ms)
+      ΓêÜ should return streak of 1 for single day entry (14 ms)
+      ΓêÜ should count consecutive days (23 ms)
+      ΓêÜ should break streak on gap (20 ms)
+      ΓêÜ should include yesterday in streak even if no pushups today (21 ms)
+    getPushupStats
+      ΓêÜ should return zeros for empty database (8 ms)
+      ΓêÜ should calculate all-time totals (20 ms)
+      ΓêÜ should count multiple entries on same day as one day (28 ms)
+    getLastPushupDate
+      ΓêÜ should return null for empty database (7 ms)
+      ΓêÜ should return the most recent timestamp (22 ms)
+    getHistory / get30DayHistory
+      ΓêÜ should return empty array for empty database (8 ms)
+      ΓêÜ should group entries by date (22 ms)
+      ΓêÜ should respect days parameter (23 ms)
+      ΓêÜ should order by date ascending (21 ms)
+
+  ΓùÅ Database Model ΓÇ║ getDailyTotal ΓÇ║ should return 0 for empty database
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 6
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "count": null,
+    +     "timestamp": null,
+    +   },
+    + ]
+
+      83 |       
+      84 |       expect(result.total).toBe(0);
+    > 85 |       expect(result.pushupDates).toEqual([]);
+         |                                  ^
+      86 |     });
+      87 |
+      88 |     test('should calculate daily total correctly', async () => {
+
+      at Object.toEqual (tests/model.test.js:85:34)
+
+  ΓùÅ Database Model ΓÇ║ getDailyTotal ΓÇ║ should calculate daily total correctly
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 60
+    Received: 10
+
+      94 |       const result = await model.getDailyTotal(db);
+      95 |       
+    > 96 |       expect(result.total).toBe(60);
+         |                            ^
+      97 |       expect(result.pushupDates).toHaveLength(3);
+      98 |     });
+      99 |
+
+      at Object.toBe (tests/model.test.js:96:28)
+
+PASS tests/edge-cases.test.js
+  Edge Cases
+    High Volume Data
+      ΓêÜ should handle 100 pushup entries (497 ms)
+      ΓêÜ should handle entries spread across many days (160 ms)
+      ΓêÜ should handle rapid sequential requests (170 ms)
+    Date Boundary Conditions
+      ΓêÜ should handle entries at midnight boundary (49 ms)
+      ΓêÜ should handle entries near end of day (40 ms)
+    Empty and Zero States
+      ΓêÜ should handle empty database gracefully (34 ms)
+      ΓêÜ should return valid structure even with no data (22 ms)
+    Streak Calculations
+      ΓêÜ should calculate streak of 1 for today only (30 ms)
+      ΓêÜ should calculate streak across consecutive days (51 ms)
+      ΓêÜ should break streak on gap (50 ms)
+      ΓêÜ should handle multiple entries per day in streak (40 ms)
+    Average Calculations
+      ΓêÜ should calculate 7-day average correctly (54 ms)
+      ΓêÜ should handle partial week correctly (44 ms)
+      ΓêÜ should exclude data older than 7 days from 7-day average (43 ms)
+    History Endpoint
+      ΓêÜ should return dates in ascending order (41 ms)
+      ΓêÜ should aggregate multiple entries per day (36 ms)
+      ΓêÜ should handle days = 1 correctly (31 ms)
+      ΓêÜ should handle days = 365 correctly (35 ms)
+    Concurrent Operations
+      ΓêÜ should handle concurrent POST requests (92 ms)
+      ΓêÜ should handle concurrent GET and POST (51 ms)
+
+------------------------|---------|----------|---------|---------|----------------------------------------------------------
+File                    | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                        
+------------------------|---------|----------|---------|---------|----------------------------------------------------------
+All files               |   39.68 |    39.37 |   40.24 |   39.51 |                                                          
+ controllers            |   65.38 |    67.27 |   71.42 |   65.38 |                                                          
+  pushupController.js   |   65.38 |    67.27 |   71.42 |   65.38 | 14-26,75,127-128,150-162,183-184,212-224,254-255,268-280 
+ db                     |   55.75 |    54.16 |   60.86 |   54.93 |                                                          
+  init.js               |       0 |        0 |       0 |       0 | 6-149                                                    
+  model.js              |   87.61 |       75 |     100 |   87.25 | 24,60,63-64,105,138,171-172,217-221,264,296,332          
+ db/migrations          |       0 |        0 |       0 |       0 |                                                          
+  001-create-pushups.js |       0 |        0 |       0 |       0 | 21-67                                                    
+ models                 |       0 |        0 |       0 |       0 |                                                          
+  pushup.js             |       0 |        0 |       0 |       0 | 20-347                                                   
+ routes                 |     100 |      100 |     100 |     100 |                                                          
+  pushups.js            |     100 |      100 |     100 |     100 |                                                          
+------------------------|---------|----------|---------|---------|----------------------------------------------------------
+Test Suites: 3 failed, 1 passed, 4 total
+Tests:       4 failed, 113 passed, 117 total
+Snapshots:   0 total
+Time:        7.307 s
+Ran all test suites.
