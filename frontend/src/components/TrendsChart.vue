@@ -87,11 +87,12 @@ const processHistoryData = (history) => {
   const dateRange = buildDateRange(30)
   const historyMap = {}
   if (history && history.length > 0) {
-    history.forEach(item => { historyMap[item.date] = item.total })
+    history.forEach(item => { historyMap[item.date] = { total: item.total, sessions: item.sessions } })
   }
 
   const labels = dateRange.map(d => formatDateLabel(d))
-  const data = dateRange.map(d => historyMap[d] ?? 0)
+  const data = dateRange.map(d => historyMap[d]?.total ?? 0)
+  const sessions = dateRange.map(d => historyMap[d]?.sessions ?? 0)
 
   // Only show chart if there's at least one day with pushups
   if (data.every(v => v === 0)) {
@@ -106,6 +107,7 @@ const processHistoryData = (history) => {
       {
         label: 'Daily Total',
         data,
+        sessions,
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(147, 197, 253, 0.1)',
         borderWidth: 2,
@@ -214,7 +216,7 @@ onMounted(() => {
 // Chart options
 const chartOptions = {
   responsive: true,
-  maintainAspectRatio: true,
+  maintainAspectRatio: false,
   plugins: {
     legend: {
       display: true,
@@ -243,7 +245,9 @@ const chartOptions = {
           if (context.dataset.label === 'Trend') {
             return 'Trend: ' + context.parsed.y + ' pushups'
           }
-          return context.parsed.y + ' pushups'
+          const sessions = context.dataset.sessions?.[context.dataIndex] ?? 0
+          const sessionLabel = sessions === 1 ? '1 session' : `${sessions} sessions`
+          return `${context.parsed.y} pushups · ${sessionLabel}`
         }
       }
     }

@@ -338,7 +338,8 @@ function get30DayHistory(db, days = 30) {
     const query = `
       SELECT
         date(timestamp) as date,
-        COALESCE(SUM(count), 0) as total
+        COALESCE(SUM(count), 0) as total,
+        COUNT(*) as sessions
       FROM pushups
       WHERE datetime(timestamp) >= datetime('now', '-' || ? || ' days')
       GROUP BY date(timestamp)
@@ -363,6 +364,33 @@ function getHistory(db, days = 30) {
 }
 
 // ============ ADMIN FUNCTIONS ============
+
+/**
+ * Get average pushups per session (all-time)
+ * @param {sqlite3.Database} db
+ * @returns {Promise<{avgPerSession: number, totalSessions: number}>}
+ */
+function getAvgPerSession(db) {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT
+        COUNT(*) as totalSessions,
+        ROUND(CAST(SUM(count) AS FLOAT) / NULLIF(COUNT(*), 0), 1) as avgPerSession
+      FROM pushups
+    `;
+    db.get(query, (err, row) => {
+      if (err) {
+        reject(new Error(`Failed to get avg per session: ${err.message}`));
+      } else {
+        resolve({
+          totalSessions: row?.totalSessions || 0,
+          avgPerSession: row?.avgPerSession || 0,
+        });
+      }
+    });
+  });
+}
+
 
 /**
  * Get all pushup entries for admin management
@@ -516,6 +544,7 @@ module.exports = {
   getLastPushupDate,
   get30DayHistory,
   getHistory,
+  getAvgPerSession,
   getAllEntries,
   updateEntry,
   deleteEntry,

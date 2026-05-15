@@ -236,6 +236,7 @@ async function getStatistics(req, res, next) {
       currentStreak,
       allTimeStats,
       lastPushupDate,
+      avgPerSession,
     ] = await Promise.all([
       model.getDailyTotal(db),
       model.get7DayAverage(db),
@@ -243,6 +244,7 @@ async function getStatistics(req, res, next) {
       model.getStreak(db),
       model.getPushupStats(db),
       model.getLastPushupDate(db),
+      model.getAvgPerSession(db),
     ]);
 
     // Return all statistics
@@ -253,6 +255,7 @@ async function getStatistics(req, res, next) {
       allTimeStats,
       thirtyDayAverage,
       lastPushupDate,
+      avgPerSession,
     });
   } catch (error) {
     console.error("Error getting statistics:", error.message);

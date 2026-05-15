@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
 
     <!-- Loading State -->
     <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="i in 5" :key="i" class="bg-slate-800 rounded-lg p-6 animate-pulse">
+      <div v-for="i in 6" :key="i" class="bg-slate-800 rounded-lg p-6 animate-pulse">
         <div class="h-4 bg-slate-700 rounded w-1/3 mb-3"></div>
         <div class="h-8 bg-slate-700 rounded w-1/2"></div>
       </div>
@@ -125,6 +125,14 @@ onBeforeUnmount(() => {
 
     <!-- Stats Grid -->
     <div v-else-if="stats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Avg Per Session -->
+      <StatCard
+        title="Avg Per Session"
+        :value="stats.avgPerSession?.avgPerSession ?? 0"
+        unit="pushups"
+        icon="💪"
+      />
+
       <!-- Daily Total -->
       <StatCard
         title="Daily Total"
