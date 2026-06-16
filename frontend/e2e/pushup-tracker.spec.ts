@@ -18,6 +18,26 @@ test.describe('Pushup Tracker App', () => {
       await expect(page.locator('footer')).toBeVisible();
       await expect(page.locator('footer')).toContainText('Pushup Tracker');
     });
+
+    test('should allow admin session settings to drive dashboard session defaults', async ({ page }) => {
+      await page.getByRole('button', { name: /Admin/i }).click();
+      await expect(page.getByRole('heading', { name: 'Admin Panel' })).toBeVisible();
+
+      await page.locator('#admin-session-default-reps').fill('26');
+      await page.locator('#admin-session-set-target').fill('7');
+      await page.locator('#admin-session-prep-seconds').fill('6');
+      await page.locator('#admin-session-rest-seconds').fill('75');
+      await page.locator('#admin-session-tick-bpm').fill('95');
+
+      await page.getByRole('button', { name: 'Save Session Settings' }).click();
+      await expect(page.getByText('Session settings saved.')).toBeVisible();
+
+      await page.getByRole('button', { name: /Back to Dashboard/i }).click();
+      await page.getByRole('button', { name: 'Session' }).click();
+
+      await expect(page.locator('#session-default-reps')).toHaveValue('26');
+      await expect(page.locator('#session-set-target')).toHaveValue('7');
+    });
   });
 
   test.describe('Pushup Form', () => {
@@ -82,6 +102,35 @@ test.describe('Pushup Tracker App', () => {
 
       await input.fill('1');
       await expect(page.getByText('Ready to log 1 pushup')).toBeVisible();
+    });
+
+    test('should support guided session start, log, and stop flow', async ({ page }) => {
+      await page.route('**/api/pushups', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ id: 1, count: 20, message: 'Pushup logged successfully' }),
+        });
+      });
+
+      await page.getByRole('button', { name: 'Session' }).click();
+
+      await expect(page.locator('#session-default-reps')).toHaveValue('20');
+      await expect(page.locator('#session-set-target')).toHaveValue('4');
+
+      await page.getByRole('button', { name: 'Start Session' }).click();
+      await expect(page.getByText('Get Ready')).toBeVisible();
+
+      await page.waitForTimeout(5500);
+      await expect(page.getByText(/Set 1 - GO/i)).toBeVisible();
+
+      await page.getByRole('button', { name: 'Log Set' }).click();
+      await expect(page.getByText(/Set 1 logged at 20 reps/i)).toBeVisible();
+      await expect(page.getByText('Rest')).toBeVisible();
+
+      await page.getByRole('button', { name: 'Stop Session' }).click();
+      await expect(page.getByText('Session Summary')).toBeVisible();
+      await expect(page.getByText('Sets completed: 1')).toBeVisible();
     });
 
     test('should submit form successfully', async ({ page }) => {

@@ -31,6 +31,7 @@ const loading = ref(true)
 const error = ref(null)
 
 const API_URL = '/api/history'
+const TRACKING_START_DATE = '2026-04-19'
 
 /**
  * Format a date string (YYYY-MM-DD) to a readable format (Mon Apr 20)
@@ -48,13 +49,18 @@ const formatDateLabel = (dateString) => {
 }
 
 /**
- * Generate an array of YYYY-MM-DD strings for the last `days` days (inclusive of today)
+ * Generate an array of YYYY-MM-DD strings from `startDate` through today (inclusive).
  */
-const buildDateRange = (days) => {
+const buildDateRange = (startDate) => {
   const dates = []
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
+  const today = new Date()
+  const start = new Date(startDate + 'T00:00:00')
+
+  if (Number.isNaN(start.getTime())) {
+    return dates
+  }
+
+  for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
     dates.push(d.toISOString().split('T')[0])
   }
   return dates
@@ -83,8 +89,8 @@ const linearTrendline = (ys) => {
  * Process history data and create chart dataset
  */
 const processHistoryData = (history) => {
-  // Build a full 30-day date range, filling missing days with 0
-  const dateRange = buildDateRange(30)
+  // Build full date range from tracking start date, filling missing days with 0
+  const dateRange = buildDateRange(TRACKING_START_DATE)
   const historyMap = {}
   if (history && history.length > 0) {
     history.forEach(item => { historyMap[item.date] = { total: item.total, sessions: item.sessions } })
@@ -145,9 +151,15 @@ const fetchHistory = async () => {
     loading.value = true
     error.value = null
 
+    const trackingStart = new Date(TRACKING_START_DATE + 'T00:00:00')
+    const today = new Date()
+    const oneDayMs = 24 * 60 * 60 * 1000
+    const daysSinceStart = Math.floor((today - trackingStart) / oneDayMs) + 1
+    const clampedDays = Math.min(365, Math.max(1, daysSinceStart))
+
     const response = await axios.get(API_URL, {
       params: {
-        days: 30
+        days: clampedDays
       }
     })
 
@@ -155,7 +167,7 @@ const fetchHistory = async () => {
     if (processedData) {
       chartData.value = processedData
     } else {
-      error.value = 'No data available for the last 30 days'
+      error.value = 'No data available yet for the selected timeline'
     }
   } catch (err) {
     console.error('Failed to fetch history:', err)
@@ -336,9 +348,9 @@ const chartOptions = {
     >
       <div class="mb-4">
         <h3 class="text-lg font-semibold text-white">
-          📈 30-Day Trend
+          📈 Trend Since Apr 19
         </h3>
-        <p class="text-sm text-slate-400 mt-1">Daily pushup totals over the last 30 days</p>
+        <p class="text-sm text-slate-400 mt-1">Daily pushup totals since April 19</p>
       </div>
 
       <!-- Chart -->

@@ -1,159 +1,99 @@
-# Synology NAS Deployment Guide
+# Synology NAS Deployment Guide (UI-Only)
 
-## Prerequisites
+## Scope
 
-1. **Synology DSM 7.2+** with **Container Manager** installed from Package Center
-2. SSH access enabled on your NAS
-3. A `docker` shared folder created
+This guide is strictly for **Container Manager UI** workflows.
+No terminal/SSH steps are part of this process.
 
-## Deployment Steps
+## Required project location
 
-### 1. Copy Project to NAS
+- Project root: `/volume1/docker/pushup-tracker`
+- Data folder: `/volume1/docker/pushup-tracker/data`
 
-Copy the **entire** `pushups` folder contents to your Synology NAS. The final structure must be:
+## Safety rules
 
-```
+1. Never mirror-copy with delete options into the live project folder.
+2. Never remove or overwrite `/volume1/docker/pushup-tracker/data`.
+3. Copy only changed files from local machine to `Z:\pushup-tracker`.
+
+## Expected project structure
+
+```text
 /volume1/docker/pushup-tracker/
-├── docker-compose.yml          ← Must be here
-├── backend/                    ← Must be sibling of docker-compose.yml
-│   ├── Dockerfile
-│   ├── package.json
-│   └── src/
-├── frontend/                   ← Must be sibling of docker-compose.yml
-│   ├── Dockerfile
-│   ├── nginx.conf
-│   ├── package.json
-│   └── src/
-└── data/                       ← Created for SQLite database
+├── compose YAML file
+├── backend/
+├── frontend/
+└── data/
 ```
 
-**IMPORTANT**: The `docker-compose.yml`, `backend/`, and `frontend/` folders must all be in the same directory!
+## First-time setup in Container Manager
 
-You can use:
-
-- **File Station** (drag and drop the entire pushups folder contents)
-- **SMB/CIFS** file share
-- **SCP** command: `scp -r ./pushups/* user@your-nas-ip:/volume1/docker/pushup-tracker/`
-
-### 2. Create Data Directory
-
-SSH into your NAS and create the data directory:
-
-```bash
-ssh user@your-nas-ip
-sudo mkdir -p /volume1/docker/pushup-tracker/data
-sudo chown 1000:1000 /volume1/docker/pushup-tracker/data
-```
-
-### 3. Deploy via Container Manager
-
-#### Option A: Using Container Manager UI (Recommended)
-
-1. Open **Container Manager** on your Synology NAS
-2. Go to **Project** tab
-3. Click **Create**
+1. Open **Container Manager**.
+2. Open **Project**.
+3. Click **Create**.
 4. Set:
-   - **Project name**: `pushup-tracker`
-   - **Path**: `/volume1/docker/pushup-tracker`
-   - **Source**: Select "Use existing docker-compose.yml"
-5. Click **Next** and review the configuration
-6. Click **Done** to start the containers
+   - Project name: `pushup-tracker`
+   - Path: `/volume1/docker/pushup-tracker`
+   - Source: existing compose YAML file in that folder
+5. Complete the wizard and start the project.
 
-#### Option B: Using SSH
+## Normal update workflow
 
-```bash
-cd /volume1/docker/pushup-tracker
-sudo docker-compose up -d --build
-```
+### 1. Copy changed files only
 
-### 4. Access Your App
+Copy only files you changed into `Z:\pushup-tracker`.
 
-- **Frontend**: `http://your-nas-ip:8080`
-- **Backend API**: `http://your-nas-ip:3001/api/statistics`
+Example frontend-only update:
 
-## Port Configuration
+- `frontend/src/components/PushupForm.vue`
+- `frontend/src/pages/Admin.vue`
+- `frontend/src/components/TrendsChart.vue`
+- `frontend/src/utils/sessionSettings.js`
 
-| Service           | Container Port | Host Port |
-| ----------------- | -------------- | --------- |
-| Frontend (nginx)  | 80             | 8080      |
-| Backend (Node.js) | 3001           | 3001      |
+### 2. Rebuild using UI
 
-You can change the host ports in `docker-compose.yml` if needed.
+1. Open **Container Manager** → **Project**.
+2. Select `pushup-tracker`.
+3. For frontend-only updates, rebuild/redeploy **frontend** only.
+4. For backend updates, rebuild/redeploy **backend** (and frontend only if needed).
 
-## Persistent Data
+## If UI changes do not appear
 
-Your pushup data is stored in:
+Use this sequence:
 
-```
-/volume1/docker/pushup-tracker/data/pushups.db
-```
+1. Open **Container Manager** → **Image**.
+2. Delete only the `pushup-tracker-frontend` image.
+3. Go to **Project** → `pushup-tracker` → **Action** → **Build**.
+4. Then **Action** → **Start**.
+5. Hard refresh browser (`Ctrl+F5`) or test in an incognito window.
 
-This folder is mapped as a volume, so your data persists across container restarts.
+## App endpoints
 
-## Updating the App
+- Frontend: `http://<nas-ip>:8080`
+- API check: `http://<nas-ip>:3001/api/statistics`
 
-1. Copy updated files to the NAS
-2. In Container Manager, select the project
-3. Click **Action** → **Stop**
-4. Click **Action** → **Build** to rebuild with new code
-5. Click **Action** → **Start**
+## Data persistence
 
-Or via SSH:
+Database files are expected in:
 
-```bash
-cd /volume1/docker/pushup-tracker
-sudo docker-compose down
-sudo docker-compose up -d --build
-```
+`/volume1/docker/pushup-tracker/data/`
 
-## Troubleshooting
+Typical files:
 
-### View Container Logs
+- `pushups.db`
+- `pushups.db-wal`
+- `pushups.db-shm`
 
-```bash
-sudo docker logs pushup-tracker-backend
-sudo docker logs pushup-tracker-frontend
-```
+## UI troubleshooting
 
-### Check Container Status
-
-```bash
-sudo docker ps
-```
-
-### Restart Containers
-
-```bash
-sudo docker-compose restart
-```
-
-### Reset Database
-
-```bash
-sudo rm /volume1/docker/pushup-tracker/data/pushups.db
-sudo docker-compose restart backend
-```
-
-## Firewall Rules
-
-If you have Synology Firewall enabled, allow these ports:
-
-- **8080** (Frontend)
-- **3001** (Backend API - only needed for direct API access)
-
-## Reverse Proxy (Optional)
-
-For HTTPS access with a custom domain, use Synology's **Reverse Proxy**:
-
-1. Go to **Control Panel** → **Login Portal** → **Advanced** → **Reverse Proxy**
-2. Create a new rule:
-   - **Source**: Your domain, HTTPS, port 443
-   - **Destination**: `localhost`, port 8080
+1. If frontend shows `host not found in upstream "backend"`:
+   - Ensure backend service is running in the same project.
+   - Rebuild/restart backend, then frontend from Project UI.
+2. For logs:
+   - **Container Manager** → **Container** → select container → **Log**.
 
 ## Backup
 
-Add the data folder to your backup solution:
+Back up this path:
 
-```
-/volume1/docker/pushup-tracker/data/
-```
+`/volume1/docker/pushup-tracker/data/`
