@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { migratePushups } = require('./migrations/001-create-pushups');
 const { migrateSessionTracking } = require('./migrations/002-add-session-tracking');
+const { migrateStreakForgiveness } = require('./migrations/003-add-streak-forgiveness');
 
 /**
  * Initializes the SQLite database
@@ -121,6 +122,8 @@ async function runMigrations(db) {
     await migratePushups(db);
     // Run the session tracking migration
     await migrateSessionTracking(db);
+    // Run the streak forgiveness migration
+    await migrateStreakForgiveness(db);
     console.log('Migrations completed successfully');
   } catch (err) {
     throw new Error(`Migration failed: ${err.message}`);

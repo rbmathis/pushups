@@ -32,6 +32,14 @@ async function createTestDatabase() {
           timestamp TEXT NOT NULL,
           created_at TEXT NOT NULL,
           session_id TEXT
+        );
+        
+        CREATE TABLE IF NOT EXISTS streak_forgiveness (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          earned_date TEXT NOT NULL,
+          used_date TEXT,
+          created_at TEXT NOT NULL,
+          UNIQUE(earned_date)
         )
       `;
 

@@ -36,7 +36,11 @@ function logPushup(db, count, timestamp, sessionId) {
       if (err) {
         reject(new Error(`Failed to log pushup: ${err.message}`));
       } else {
-        // Return the inserted record with the ID
+        // Asynchronously update streak forgiveness (fire and forget)
+        updateStreakForgiveness(db).catch((error) => {
+          console.error('Error updating streak forgiveness:', error);
+        });
+
         resolve({
           id: this.lastID,
           count,
@@ -171,8 +175,10 @@ function get30DayAverage(db) {
 /**
  * Get the current streak (consecutive days with pushups)
  * Counts consecutive days with pushups ending today
+ * Includes streak forgiveness logic: if on a day with 0 pushups,
+ * check if forgiveness token is available and use it
  * @param {sqlite3.Database} db - Database connection
- * @returns {Promise<{currentStreak: number, lastPushupDate: string|null}>} Current streak in days and last pushup date
+ * @returns {Promise<{currentStreak: number, lastPushupDate: string|null, forgivenessUsed: boolean}>}
  */
 function getStreak(db) {
   return new Promise((resolve, reject) => {
@@ -193,6 +199,7 @@ function getStreak(db) {
         resolve({
           currentStreak: 0,
           lastPushupDate: null,
+          forgivenessUsed: false,
         });
         return;
       }
@@ -200,7 +207,6 @@ function getStreak(db) {
       const lastPushupDate = rows[0].date;
 
       // Get today's date in CST
-      // Create a date object and format it using the timezone formatter
       const now = new Date();
       const cstFormatter = new Intl.DateTimeFormat("en-US", {
         timeZone: "America/Chicago",
@@ -216,12 +222,9 @@ function getStreak(db) {
       });
       const todayCST = `${values.year}-${values.month}-${values.day}`;
 
-      // Check if the streak is still active (includes today or yesterday)
+      // Check if the streak is still active
       const today = new Date(todayCST);
       today.setHours(0, 0, 0, 0);
-
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
 
       const lastDate = new Date(lastPushupDate);
       lastDate.setHours(0, 0, 0, 0);
@@ -229,35 +232,66 @@ function getStreak(db) {
       const timeDiff = Math.abs(today.getTime() - lastDate.getTime());
       const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
 
-      // If last pushup was more than 1 day ago, streak is broken
+      // If more than 1 day ago, check for forgiveness on the gap day
+      let forgivenessUsed = false;
       if (daysDiff > 1) {
-        resolve({
-          currentStreak: 0,
-          lastPushupDate,
-        });
-        return;
+        // Last pushup was >1 day ago, check if we can use forgiveness
+        const gapDay = new Date(lastDate);
+        gapDay.setDate(gapDay.getDate() + 1);
+        const gapDayStr = gapDay.toISOString().split('T')[0];
+
+        // Check for unused forgiveness on the gap day (non-blocking)
+        useStreakForgivenessIfAvailable(db, gapDayStr)
+          .then((used) => {
+            forgivenessUsed = used;
+            if (!forgivenessUsed) {
+              resolve({
+                currentStreak: 0,
+                lastPushupDate,
+                forgivenessUsed: false,
+              });
+              return;
+            }
+            // Continue calculating streak if forgiveness was used
+            continueStreakCalculation(rows, lastPushupDate, forgivenessUsed);
+          })
+          .catch((error) => {
+            console.error('Error checking forgiveness:', error);
+            // Treat error as no forgiveness available
+            resolve({
+              currentStreak: 0,
+              lastPushupDate,
+              forgivenessUsed: false,
+            });
+          });
+      } else {
+        // Streak is still active, calculate it
+        continueStreakCalculation(rows, lastPushupDate, forgivenessUsed);
       }
 
-      // Calculate current streak by comparing consecutive dates
-      let streak = 1;
-      for (let i = 0; i < rows.length - 1; i++) {
-        const currentDate = new Date(rows[i].date);
-        const nextDate = new Date(rows[i + 1].date);
+      function continueStreakCalculation(rows, lastPushupDate, forgivenessUsed) {
+        // Calculate current streak by comparing consecutive dates
+        let streak = 1;
+        for (let i = 0; i < rows.length - 1; i++) {
+          const currentDate = new Date(rows[i].date);
+          const nextDate = new Date(rows[i + 1].date);
 
-        const diffTime = Math.abs(currentDate.getTime() - nextDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          const diffTime = Math.abs(currentDate.getTime() - nextDate.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        if (diffDays === 1) {
-          streak++;
-        } else {
-          break;
+          if (diffDays === 1) {
+            streak++;
+          } else {
+            break;
+          }
         }
-      }
 
-      resolve({
-        currentStreak: streak,
-        lastPushupDate,
-      });
+        resolve({
+          currentStreak: streak,
+          lastPushupDate,
+          forgivenessUsed,
+        });
+      }
     });
   });
 }
@@ -566,6 +600,168 @@ function getTimeOfDay(db) {
   });
 }
 
+/**
+ * Count unique sessions for a specific date
+ * @param {sqlite3.Database} db
+ * @param {string} dateStr - Date in YYYY-MM-DD format
+ * @returns {Promise<number>} Number of unique sessions on that date
+ */
+function countSessionsForDate(db, dateStr) {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT COUNT(DISTINCT session_id) as session_count
+      FROM pushups
+      WHERE DATE(timestamp) = ? AND session_id IS NOT NULL
+    `;
+
+    db.get(query, [dateStr], (err, row) => {
+      if (err) {
+        reject(new Error(`Failed to count sessions: ${err.message}`));
+      } else {
+        resolve(row?.session_count || 0);
+      }
+    });
+  });
+}
+
+/**
+ * Award streak forgiveness if conditions are met
+ * Every 3 consecutive days with at least 4 sessions = 1 forgiveness token
+ * @param {sqlite3.Database} db
+ * @returns {Promise<void>}
+ */
+function updateStreakForgiveness(db) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Get all unique dates with pushups (last 30 days), ordered DESC
+      const query = `
+        SELECT DISTINCT DATE(timestamp) as date
+        FROM pushups
+        WHERE DATE(timestamp) >= DATE('now', '-30 days')
+        ORDER BY DATE(timestamp) DESC
+        LIMIT 30
+      `;
+
+      db.all(query, async (err, rows) => {
+        if (err) {
+          reject(new Error(`Failed to get dates: ${err.message}`));
+          return;
+        }
+
+        if (!rows || rows.length < 3) {
+          resolve();
+          return;
+        }
+
+        // Check for 3-day streaks with 4+ sessions
+        for (let i = 0; i <= rows.length - 3; i++) {
+          const date1 = new Date(rows[i].date);
+          const date2 = new Date(rows[i + 1].date);
+          const date3 = new Date(rows[i + 2].date);
+
+          // Check if consecutive days
+          const diff1 = Math.abs(date1.getTime() - date2.getTime()) / (1000 * 60 * 60 * 24);
+          const diff2 = Math.abs(date2.getTime() - date3.getTime()) / (1000 * 60 * 60 * 24);
+
+          if (diff1 === 1 && diff2 === 1) {
+            // These are 3 consecutive days; count sessions for each
+            try {
+              const sessions1 = await countSessionsForDate(db, rows[i].date);
+              const sessions2 = await countSessionsForDate(db, rows[i + 1].date);
+              const sessions3 = await countSessionsForDate(db, rows[i + 2].date);
+
+              // If all 3 days have 4+ sessions, award forgiveness for the 4th day
+              if (sessions1 >= 4 && sessions2 >= 4 && sessions3 >= 4) {
+                const day4 = new Date(date3);
+                day4.setDate(day4.getDate() + 1);
+                const day4Str = day4.toISOString().split('T')[0];
+
+                // Check if we already awarded forgiveness for this 4th day
+                const checkQuery = `
+                  SELECT id FROM streak_forgiveness
+                  WHERE earned_date = ?
+                `;
+
+                db.get(checkQuery, [day4Str], (checkErr, existingRow) => {
+                  if (checkErr) {
+                    console.error('Error checking existing forgiveness:', checkErr);
+                    return;
+                  }
+
+                  if (!existingRow) {
+                    // Award new forgiveness
+                    const insertQuery = `
+                      INSERT INTO streak_forgiveness (earned_date, created_at)
+                      VALUES (?, ?)
+                    `;
+
+                    db.run(insertQuery, [day4Str, new Date().toISOString()], (insertErr) => {
+                      if (insertErr) {
+                        console.error('Error awarding forgiveness:', insertErr);
+                      }
+                    });
+                  }
+                });
+              }
+            } catch (error) {
+              console.error('Error checking sessions:', error);
+            }
+          }
+        }
+
+        resolve();
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+/**
+ * Check if a streak should be forgiven
+ * Consumes one forgiveness token if available on the given date
+ * @param {sqlite3.Database} db
+ * @param {string} dateStr - Date in YYYY-MM-DD format
+ * @returns {Promise<boolean>} True if forgiveness was used
+ */
+function useStreakForgivenessIfAvailable(db, dateStr) {
+  return new Promise((resolve, reject) => {
+    // Check for unused forgiveness on this date
+    const checkQuery = `
+      SELECT id FROM streak_forgiveness
+      WHERE earned_date = ? AND used_date IS NULL
+      LIMIT 1
+    `;
+
+    db.get(checkQuery, [dateStr], (err, row) => {
+      if (err) {
+        reject(new Error(`Failed to check forgiveness: ${err.message}`));
+        return;
+      }
+
+      if (!row) {
+        resolve(false);
+        return;
+      }
+
+      // Mark as used
+      const updateQuery = `
+        UPDATE streak_forgiveness
+        SET used_date = ?
+        WHERE id = ?
+      `;
+
+      db.run(updateQuery, [dateStr, row.id], (updateErr) => {
+        if (updateErr) {
+          reject(new Error(`Failed to use forgiveness: ${updateErr.message}`));
+        } else {
+          resolve(true);
+        }
+      });
+    });
+  });
+}
+
 module.exports = {
   logPushup,
   getDailyTotal,
@@ -582,4 +778,7 @@ module.exports = {
   updateEntry,
   deleteEntry,
   getTimeOfDay,
+  countSessionsForDate,
+  updateStreakForgiveness,
+  useStreakForgivenessIfAvailable,
 };
