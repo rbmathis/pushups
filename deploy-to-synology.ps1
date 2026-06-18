@@ -1,5 +1,5 @@
 # Pushup Tracker Deployment Script for Synology NAS
-# Copies changed files to Z:\pushup-tracker
+# Dynamically finds changed files and copies them to Z:\pushup-tracker
 
 $sourceRoot = "C:\Users\rdpuser\Source\pushups"
 $destRoot = "Z:\pushup-tracker"
@@ -19,45 +19,42 @@ if (!(Test-Path $destRoot)) {
   exit 1
 }
 
-# Files to copy (frontend)
-$frontendFiles = @(
-  "frontend/src/components/QuickAddForm.vue",
-  "frontend/src/components/SessionLinkBox.vue",
-  "frontend/src/components/SessionStats.vue",
-  "frontend/src/App.vue",
-  "frontend/src/pages/Dashboard.vue",
-  "frontend/src/pages/Session.vue",
-  "frontend/src/components/PushupForm.vue",
-  "frontend/src/components/StatsDashboard.vue"
-)
+# Get changed files from git (unstaged + staged)
+Write-Host "📊 Scanning for changed files..." -ForegroundColor Yellow
+Push-Location $sourceRoot
+$changedFiles = @()
+try {
+  # Get list of changed files (both staged and unstaged, exclude WAL/lock files)
+  $gitDiff = git diff --name-only --diff-filter=ACMR | Where-Object { $_ -notmatch '\.(db-shm|db-wal|db-journal)$' }
+  $gitStatus = git status --porcelain | Where-Object { $_ -notmatch '\.(db-shm|db-wal|db-journal)$' } | ForEach-Object { $_.substring(3) }
+  
+  $changedFiles = @($gitDiff) + @($gitStatus) | Sort-Object -Unique | Where-Object { $_ -and (Test-Path (Join-Path $sourceRoot $_)) }
+  
+  if ($changedFiles.Count -eq 0) {
+    Write-Host "⚠️  No changed files detected!" -ForegroundColor Yellow
+    Write-Host "All files are committed. If you made changes, stage them first:" -ForegroundColor Gray
+    Write-Host "  git add ." -ForegroundColor Gray
+    exit 0
+  }
+} catch {
+  Write-Host "❌ Error reading git status: $_" -ForegroundColor Red
+  exit 1
+} finally {
+  Pop-Location
+}
 
-# Files to copy (backend)
-$backendFiles = @(
-  "backend/src/db/migrations/002-add-session-tracking.js",
-  "backend/src/db/init.js",
-  "backend/src/db/model.js",
-  "backend/src/controllers/pushupController.js",
-  "backend/tests/setup.js"
-)
-
-$allFiles = $frontendFiles + $backendFiles
+$allFiles = $changedFiles
 $successCount = 0
 $failCount = 0
 
-Write-Host "📋 Copying files..." -ForegroundColor Yellow
+Write-Host "📋 Files to copy:" -ForegroundColor Yellow
+$allFiles | ForEach-Object { Write-Host "   • $_" -ForegroundColor Gray }
 Write-Host ""
 
 foreach ($file in $allFiles) {
   $srcPath = Join-Path $sourceRoot $file
   $dstPath = Join-Path $destRoot $file
   $dstDir = Split-Path $dstPath
-  
-  # Check if source exists
-  if (!(Test-Path $srcPath)) {
-    Write-Host "⚠️  SKIP: $file (not found)" -ForegroundColor Yellow
-    $failCount++
-    continue
-  }
   
   # Create destination directory if needed
   if (!(Test-Path $dstDir)) {
