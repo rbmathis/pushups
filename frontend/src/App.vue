@@ -1,11 +1,23 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import Header from './components/Header.vue'
 import Dashboard from './pages/Dashboard.vue'
 import Session from './pages/Session.vue'
 import Admin from './pages/Admin.vue'
 
 const currentPage = ref('dashboard')
+
+const handleNavigateToSession = () => {
+  currentPage.value = 'session'
+}
+
+onMounted(() => {
+  window.addEventListener('navigate-to-session', handleNavigateToSession)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('navigate-to-session', handleNavigateToSession)
+})
 </script>
 
 <template>
