@@ -152,12 +152,15 @@ onBeforeUnmount(() => {
             <span class="text-white font-semibold">{{ formatNumber(stats.dailyTotal?.total ?? stats.dailyTotal) }}</span>
           </div>
           <div class="flex justify-between items-center pb-2 border-b border-purple-700">
-            <span class="text-purple-200 text-sm">Current Streak</span>
-            <span class="text-white font-semibold">{{ formatNumber(stats.currentStreak?.currentStreak ?? stats.currentStreak) }} days</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-purple-200 text-sm">All-Time Total</span>
-            <span class="text-white font-semibold">{{ formatNumber(stats.allTimeStats?.totalPushups || 0) }}</span>
+           <span class="text-purple-200 text-sm flex items-center gap-1">
+             Current Streak
+             <span v-if="stats.currentStreak?.forgivenessUsed" class="text-xs bg-yellow-600 px-2 py-0.5 rounded" title="Streak continued with forgiveness token">💛</span>
+           </span>
+           <span class="text-white font-semibold">{{ formatNumber(stats.currentStreak?.currentStreak ?? stats.currentStreak) }} days</span>
+         </div>
+         <div class="flex justify-between items-center">
+           <span class="text-purple-200 text-sm">All-Time Total</span>
+           <span class="text-white font-semibold">{{ formatNumber(stats.allTimeStats?.totalPushups || 0) }}</span>
           </div>
         </div>
       </div>
