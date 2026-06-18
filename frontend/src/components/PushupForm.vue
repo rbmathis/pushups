@@ -233,6 +233,7 @@ const currentSetElapsedSeconds = ref(0)
 const completedSetReps = ref([])
 const sessionStartedAt = ref(null)
 const sessionEndedAt = ref(null)
+const currentSessionId = ref(null)
 
 const phaseIntervalId = ref(null)
 const elapsedIntervalId = ref(null)
@@ -384,6 +385,7 @@ async function startSession() {
   sessionStartedAt.value = Date.now()
   sessionEndedAt.value = null
   currentSetElapsedSeconds.value = 0
+  currentSessionId.value = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
   isSessionRunning.value = true
 
   await ensureAudioContext()
@@ -439,6 +441,12 @@ function startCountdownTimer(onComplete) {
   stopPhaseTimer()
   phaseIntervalId.value = setInterval(() => {
     sessionCountdownSeconds.value -= 1
+    
+    // Beep during last 5 seconds of rest period
+    if (sessionPhase.value === 'rest' && sessionCountdownSeconds.value <= 5 && sessionCountdownSeconds.value > 0) {
+      playTone({ frequency: 600, durationSeconds: 0.06, gainValue: 0.04 })
+    }
+    
     if (sessionCountdownSeconds.value <= 0) {
       stopPhaseTimer()
       onComplete()
@@ -460,7 +468,7 @@ async function logActiveSet() {
   try {
     await axios.post('/api/pushups', {
       count: sessionPushupCount.value,
-      date: new Date().toISOString().split('T')[0]
+      sessionId: currentSessionId.value,
     })
 
     completedSetReps.value = [...completedSetReps.value, sessionPushupCount.value]

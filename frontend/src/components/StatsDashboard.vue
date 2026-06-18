@@ -125,12 +125,20 @@ onBeforeUnmount(() => {
 
     <!-- Stats Grid -->
     <div v-else-if="stats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Avg Per Set -->
+      <StatCard
+        title="Avg Per Set"
+        :value="stats.avgPerSet?.avgPerSet ?? 0"
+        unit="pushups"
+        icon="💪"
+      />
+
       <!-- Avg Per Session -->
       <StatCard
         title="Avg Per Session"
         :value="stats.avgPerSession?.avgPerSession ?? 0"
         unit="pushups"
-        icon="💪"
+        icon="🎯"
       />
 
       <!-- Daily Total -->

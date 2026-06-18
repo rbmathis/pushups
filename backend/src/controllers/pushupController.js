@@ -140,12 +140,12 @@ function validateDays(days) {
 /**
  * Logs a pushup entry
  * POST /api/pushups
- * Request body: {count: number}
- * Response: {id, count, timestamp, created_at, message: "Pushup logged successfully"}
+ * Request body: {count: number, sessionId?: string}
+ * Response: {id, count, timestamp, created_at, sessionId, message: "Pushup logged successfully"}
  */
 async function logPushup(req, res, next) {
   try {
-    const { count } = req.body;
+    const { count, sessionId } = req.body;
 
     // Validate count
     const validation = validateCount(count);
@@ -176,7 +176,7 @@ async function logPushup(req, res, next) {
     );
 
     // Log pushup to database
-    const result = await model.logPushup(db, count, cstTime);
+    const result = await model.logPushup(db, count, cstTime, sessionId);
 
     // Return success response
     res.status(201).json({
@@ -184,6 +184,7 @@ async function logPushup(req, res, next) {
       count: result.count,
       timestamp: result.timestamp,
       created_at: result.created_at,
+      sessionId: result.sessionId,
       message: "Pushup logged successfully",
     });
   } catch (error) {
@@ -237,6 +238,7 @@ async function getStatistics(req, res, next) {
       allTimeStats,
       lastPushupDate,
       avgPerSession,
+      avgPerSet,
     ] = await Promise.all([
       model.getDailyTotal(db),
       model.get7DayAverage(db),
@@ -245,6 +247,7 @@ async function getStatistics(req, res, next) {
       model.getPushupStats(db),
       model.getLastPushupDate(db),
       model.getAvgPerSession(db),
+      model.getAvgPerSet(db),
     ]);
 
     // Return all statistics
@@ -256,6 +259,7 @@ async function getStatistics(req, res, next) {
       thirtyDayAverage,
       lastPushupDate,
       avgPerSession,
+      avgPerSet,
     });
   } catch (error) {
     console.error("Error getting statistics:", error.message);

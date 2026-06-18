@@ -7,6 +7,7 @@ const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 const path = require('path');
 const { migratePushups } = require('./migrations/001-create-pushups');
+const { migrateSessionTracking } = require('./migrations/002-add-session-tracking');
 
 /**
  * Initializes the SQLite database
@@ -118,6 +119,8 @@ async function runMigrations(db) {
   try {
     // Run the pushups migration
     await migratePushups(db);
+    // Run the session tracking migration
+    await migrateSessionTracking(db);
     console.log('Migrations completed successfully');
   } catch (err) {
     throw new Error(`Migration failed: ${err.message}`);

@@ -20,18 +20,19 @@ function getTodayDateString() {
  * @param {sqlite3.Database} db - Database connection
  * @param {number} count - Number of pushups performed
  * @param {string} timestamp - Timestamp when pushups were performed (ISO 8601 in CST)
- * @returns {Promise<{id, count, timestamp, created_at}>} - Returns the inserted record
+ * @param {string} sessionId - Optional session ID to group sets
+ * @returns {Promise<{id, count, timestamp, created_at, sessionId}>} - Returns the inserted record
  */
-function logPushup(db, count, timestamp) {
+function logPushup(db, count, timestamp, sessionId) {
   return new Promise((resolve, reject) => {
     const created_at = new Date().toISOString();
 
     const query = `
-      INSERT INTO pushups (count, timestamp, created_at)
-      VALUES (?, ?, ?)
+      INSERT INTO pushups (count, timestamp, created_at, session_id)
+      VALUES (?, ?, ?, ?)
     `;
 
-    db.run(query, [count, timestamp, created_at], function (err) {
+    db.run(query, [count, timestamp, created_at, sessionId || null], function (err) {
       if (err) {
         reject(new Error(`Failed to log pushup: ${err.message}`));
       } else {
@@ -41,6 +42,7 @@ function logPushup(db, count, timestamp) {
           count,
           timestamp,
           created_at,
+          sessionId: sessionId || null,
         });
       }
     });
@@ -367,16 +369,20 @@ function getHistory(db, days = 30) {
 
 /**
  * Get average pushups per session (all-time)
+ * A session is a group of sets logged with the same session_id.
+ * Sessions are created when a user runs the session mode.
  * @param {sqlite3.Database} db
  * @returns {Promise<{avgPerSession: number, totalSessions: number}>}
  */
 function getAvgPerSession(db) {
   return new Promise((resolve, reject) => {
+    // Count distinct sessions (groups with same session_id) and their totals
     const query = `
       SELECT
-        COUNT(*) as totalSessions,
-        ROUND(CAST(SUM(count) AS FLOAT) / NULLIF(COUNT(*), 0), 1) as avgPerSession
+        COUNT(DISTINCT session_id) as totalSessions,
+        ROUND(CAST(SUM(count) AS FLOAT) / NULLIF(COUNT(DISTINCT session_id), 0), 1) as avgPerSession
       FROM pushups
+      WHERE session_id IS NOT NULL
     `;
     db.get(query, (err, row) => {
       if (err) {
@@ -385,6 +391,32 @@ function getAvgPerSession(db) {
         resolve({
           totalSessions: row?.totalSessions || 0,
           avgPerSession: row?.avgPerSession || 0,
+        });
+      }
+    });
+  });
+}
+
+/**
+ * Get average pushups per set (individual entries)
+ * @param {sqlite3.Database} db
+ * @returns {Promise<{avgPerSet: number, totalSets: number}>}
+ */
+function getAvgPerSet(db) {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT
+        COUNT(*) as totalSets,
+        ROUND(CAST(SUM(count) AS FLOAT) / NULLIF(COUNT(*), 0), 1) as avgPerSet
+      FROM pushups
+    `;
+    db.get(query, (err, row) => {
+      if (err) {
+        reject(new Error(`Failed to get avg per set: ${err.message}`));
+      } else {
+        resolve({
+          totalSets: row?.totalSets || 0,
+          avgPerSet: row?.avgPerSet || 0,
         });
       }
     });
@@ -545,6 +577,7 @@ module.exports = {
   get30DayHistory,
   getHistory,
   getAvgPerSession,
+  getAvgPerSet,
   getAllEntries,
   updateEntry,
   deleteEntry,

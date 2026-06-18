@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import Header from './components/Header.vue'
 import Dashboard from './pages/Dashboard.vue'
+import Session from './pages/Session.vue'
 import Admin from './pages/Admin.vue'
 
 const currentPage = ref('dashboard')
@@ -12,8 +13,15 @@ const currentPage = ref('dashboard')
     <!-- Header -->
     <Header />
 
-    <!-- Admin Link -->
-    <div class="container mx-auto px-4 pt-4 flex justify-end">
+    <!-- Navigation Buttons -->
+    <div class="container mx-auto px-4 pt-4 flex justify-end gap-2">
+      <button
+        v-if="currentPage !== 'session'"
+        @click="currentPage = 'session'"
+        class="text-sm text-gray-400 hover:text-white transition-colors"
+      >
+        🏋️ Session
+      </button>
       <button
         v-if="currentPage === 'dashboard'"
         @click="currentPage = 'admin'"
@@ -22,7 +30,7 @@ const currentPage = ref('dashboard')
         ⚙️ Admin
       </button>
       <button
-        v-else
+        v-if="currentPage !== 'dashboard'"
         @click="currentPage = 'dashboard'"
         class="text-sm text-gray-400 hover:text-white transition-colors"
       >
@@ -33,6 +41,7 @@ const currentPage = ref('dashboard')
     <!-- Main Content -->
     <main class="container mx-auto px-4 py-4">
       <Dashboard v-if="currentPage === 'dashboard'" />
+      <Session v-else-if="currentPage === 'session'" />
       <Admin v-else-if="currentPage === 'admin'" />
     </main>
 

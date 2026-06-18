@@ -30,7 +30,8 @@ async function createTestDatabase() {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           count INTEGER NOT NULL,
           timestamp TEXT NOT NULL,
-          created_at TEXT NOT NULL
+          created_at TEXT NOT NULL,
+          session_id TEXT
         )
       `;
 
