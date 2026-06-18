@@ -43,29 +43,53 @@ No terminal/SSH steps are part of this process.
 
 Copy only files you changed into `Z:\pushup-tracker`.
 
-Example frontend-only update:
+Use the `deploy-to-synology.ps1` script from the repo:
+```powershell
+cd C:\Users\rdpuser\Source\pushups
+.\deploy-to-synology.ps1
+```
+
+Or manually copy changed files. Example frontend-only update:
 
 - `frontend/src/components/PushupForm.vue`
 - `frontend/src/pages/Admin.vue`
 - `frontend/src/components/TrendsChart.vue`
 - `frontend/src/utils/sessionSettings.js`
 
-### 2. Rebuild using UI
+### 2. Delete images (required to pick up new code)
 
-1. Open **Container Manager** → **Project**.
-2. Select `pushup-tracker`.
-3. For frontend-only updates, rebuild/redeploy **frontend** only.
-4. For backend updates, rebuild/redeploy **backend** (and frontend only if needed).
+**⚠️ Important:** Stop/rebuild alone does NOT pick up new code changes.
+You must delete the old images first.
+
+1. Open **Container Manager** → **Image**
+2. **Delete** `pushup-tracker-frontend` image (and `pushup-tracker-backend` if backend changed)
+3. Then proceed to rebuild
+
+### 3. Rebuild and start
+
+1. Open **Container Manager** → **Project**
+2. Select `pushup-tracker`
+3. Click **Action** → **Build** (rebuilds from your updated files)
+4. Click **Action** → **Start**
+5. Wait for containers to start (watch the logs if needed)
 
 ## If UI changes do not appear
 
-Use this sequence:
+**⚠️ Do NOT use stop/rebuild alone - it does not pick up code changes.**
 
-1. Open **Container Manager** → **Image**.
-2. Delete only the `pushup-tracker-frontend` image.
-3. Go to **Project** → `pushup-tracker` → **Action** → **Build**.
-4. Then **Action** → **Start**.
-5. Hard refresh browser (`Ctrl+F5`) or test in an incognito window.
+Use this proven sequence:
+
+1. Open **Container Manager** → **Image**
+2. **Delete** the old images:
+   - `pushup-tracker-frontend`
+   - `pushup-tracker-backend` (if you changed backend code)
+3. Go to **Container Manager** → **Project** → `pushup-tracker`
+4. Click **Action** → **Build** (rebuilds fresh images with new code)
+5. Click **Action** → **Start**
+6. Wait for containers to start
+7. Hard refresh browser (`Ctrl+F5`) or test in incognito window
+
+This forces a clean rebuild and ensures new code is picked up.
 
 ## App endpoints
 
