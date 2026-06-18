@@ -35,7 +35,8 @@ const fetchStats = async () => {
       thirtyDayAverage: { average: 42.8 },
       allTimeStats: { totalPushups: 5432 },
       avgPerSession: { avgPerSession: 0 },
-      avgPerSet: { avgPerSet: 0 }
+      avgPerSet: { avgPerSet: 0 },
+      lifelinesEarned: 0
     }
   } finally {
     loading.value = false
@@ -157,6 +158,10 @@ onBeforeUnmount(() => {
              <span v-if="stats.currentStreak?.forgivenessUsed" class="text-xs bg-yellow-600 px-2 py-0.5 rounded" title="Streak continued with forgiveness token">💛</span>
            </span>
            <span class="text-white font-semibold">{{ formatNumber(stats.currentStreak?.currentStreak ?? stats.currentStreak) }} days</span>
+         </div>
+         <div class="flex justify-between items-center pb-2 border-b border-purple-700">
+           <span class="text-purple-200 text-sm">Lifelines Earned 🛟</span>
+           <span class="text-white font-semibold">{{ formatNumber(stats.lifelinesEarned ?? 0) }}</span>
          </div>
          <div class="flex justify-between items-center">
            <span class="text-purple-200 text-sm">All-Time Total</span>

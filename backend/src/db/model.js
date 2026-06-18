@@ -601,6 +601,29 @@ function getTimeOfDay(db) {
 }
 
 /**
+ * Count earned (unused) lifelines/forgiveness tokens
+ * @param {sqlite3.Database} db
+ * @returns {Promise<number>} Number of unused forgiveness tokens
+ */
+function getLifelinesEarned(db) {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT COUNT(*) as count
+      FROM streak_forgiveness
+      WHERE used_date IS NULL
+    `;
+
+    db.get(query, (err, row) => {
+      if (err) {
+        reject(new Error(`Failed to get lifelines: ${err.message}`));
+      } else {
+        resolve(row?.count || 0);
+      }
+    });
+  });
+}
+
+/**
  * Count unique sessions for a specific date
  * @param {sqlite3.Database} db
  * @param {string} dateStr - Date in YYYY-MM-DD format
@@ -778,6 +801,7 @@ module.exports = {
   updateEntry,
   deleteEntry,
   getTimeOfDay,
+  getLifelinesEarned,
   countSessionsForDate,
   updateStreakForgiveness,
   useStreakForgivenessIfAvailable,
