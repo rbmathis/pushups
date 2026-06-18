@@ -2,7 +2,7 @@
   <div class="w-full max-w-md mx-auto p-6 bg-gray-900 rounded-lg shadow-lg border border-gray-800">
     <h2 class="text-2xl font-bold text-white mb-4">Log Pushups</h2>
 
-    <div class="mb-5 bg-gray-800 rounded-lg p-1 grid grid-cols-2 gap-1">
+    <div v-if="!sessionOnly" class="mb-5 bg-gray-800 rounded-lg p-1 grid grid-cols-2 gap-1">
       <button
         type="button"
         class="px-3 py-2 text-sm font-semibold rounded-md transition-colors"
@@ -44,7 +44,7 @@
       </div>
     </transition>
 
-    <form v-if="entryMode === 'manual'" @submit.prevent="submitManualForm" class="space-y-4">
+    <form v-if="!sessionOnly && entryMode === 'manual'" @submit.prevent="submitManualForm" class="space-y-4">
       <div>
         <label for="pushup-count" class="block text-sm font-medium text-gray-300 mb-2">
           Number of Pushups
@@ -210,10 +210,14 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import axios from 'axios'
 import { loadSessionSettings } from '../utils/sessionSettings'
 
+const props = defineProps({
+  sessionOnly: Boolean
+})
+
 const emit = defineEmits(['pushups-logged'])
 const sessionSettings = loadSessionSettings()
 
-const entryMode = ref('manual')
+const entryMode = ref(props.sessionOnly ? 'session' : 'manual')
 const manualPushupCount = ref(30)
 const isManualLoading = ref(false)
 const successMessage = ref('')
@@ -581,6 +585,16 @@ onBeforeUnmount(() => {
   if (audioContextRef.value && audioContextRef.value.state !== 'closed') {
     audioContextRef.value.close()
   }
+})
+
+defineExpose({
+  completedSetCount,
+  sessionSetTarget,
+  totalSessionPushups,
+  averageRepsPerSet,
+  formattedSessionDuration,
+  sessionPhase,
+  isSessionRunning,
 })
 </script>
 

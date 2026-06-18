@@ -1,22 +1,49 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import PushupForm from '../components/PushupForm.vue'
-import StatsDashboard from '../components/StatsDashboard.vue'
+import SessionStats from '../components/SessionStats.vue'
 
-const statsDashboardRef = ref(null)
-const refreshing = ref(false)
+const pushupFormRef = ref(null)
+
+// Local state for stats
+const completedSetCount = ref(0)
+const sessionSetTarget = ref(0)
+const totalSessionPushups = ref(0)
+const averageRepsPerSet = ref(0)
+const formattedSessionDuration = ref('00:00')
 
 const handlePushupsLogged = async () => {
-  // Add a small delay to allow the backend to process the data
-  await new Promise(resolve => setTimeout(resolve, 500))
+  // Stats will update via watchers automatically
+}
 
-  // Trigger stats refresh
-  if (statsDashboardRef.value) {
-    refreshing.value = true
-    await statsDashboardRef.value.refreshStats()
-    refreshing.value = false
+// Watch for changes in form component and update local state
+const updateStatsFromForm = () => {
+  if (pushupFormRef.value) {
+    completedSetCount.value = pushupFormRef.value.completedSetCount
+    sessionSetTarget.value = pushupFormRef.value.sessionSetTarget
+    totalSessionPushups.value = pushupFormRef.value.totalSessionPushups
+    averageRepsPerSet.value = pushupFormRef.value.averageRepsPerSet
+    formattedSessionDuration.value = pushupFormRef.value.formattedSessionDuration
   }
 }
+
+// Set up a timer to poll form state every second
+let updateInterval = null
+const startPolling = () => {
+  updateInterval = setInterval(updateStatsFromForm, 1000)
+}
+const stopPolling = () => {
+  if (updateInterval) clearInterval(updateInterval)
+}
+
+// Start polling on mount
+onMounted(() => {
+  startPolling()
+})
+
+onBeforeUnmount(() => {
+  stopPolling()
+})
 </script>
 
 <template>
@@ -33,22 +60,23 @@ const handlePushupsLogged = async () => {
         <!-- Session Form (Left) -->
         <div class="lg:col-span-1">
           <div class="bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg p-6 shadow-lg border border-slate-600 sticky top-6">
-            <PushupForm @pushups-logged="handlePushupsLogged" />
+            <PushupForm 
+              ref="pushupFormRef"
+              session-only 
+              @pushups-logged="handlePushupsLogged" 
+            />
           </div>
         </div>
 
-        <!-- Stats & Analytics (Right) -->
+        <!-- Session Stats (Right) -->
         <div class="lg:col-span-2">
-          <div>
-            <div class="flex items-center justify-between mb-6">
-              <h2 class="text-2xl font-bold text-white">Session Stats</h2>
-              <div v-if="refreshing" class="flex items-center gap-2 text-blue-400 text-sm">
-                <span class="inline-block animate-spin">⟳</span>
-                <span>Updating...</span>
-              </div>
-            </div>
-            <StatsDashboard ref="statsDashboardRef" />
-          </div>
+          <SessionStats 
+            :completed-set-count="pushupFormRef?.completedSetCount ?? 0"
+            :session-set-target="pushupFormRef?.sessionSetTarget ?? 0"
+            :total-session-pushups="pushupFormRef?.totalSessionPushups ?? 0"
+            :average-reps-per-set="pushupFormRef?.averageRepsPerSet ?? 0"
+            :formatted-session-duration="pushupFormRef?.formattedSessionDuration ?? '00:00'"
+          />
         </div>
       </div>
 
@@ -74,7 +102,7 @@ const handlePushupsLogged = async () => {
           </li>
           <li class="flex gap-3">
             <span class="text-blue-400 font-bold">5.</span>
-            <span>Each set is grouped into one session for analytics</span>
+            <span>Watch progress update in real-time above</span>
           </li>
         </ul>
       </div>
