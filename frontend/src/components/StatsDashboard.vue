@@ -1,7 +1,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
-import StatCard from './StatCard.vue'
 
 const stats = ref(null)
 const loading = ref(true)
@@ -23,22 +22,20 @@ const fetchStats = async () => {
     const response = await axios.get(API_URL)
     stats.value = response.data
 
-    // Show update feedback if not initial load
     if (!loading.value || stats.value) {
       showRefreshFeedback()
     }
   } catch (err) {
     console.error('Failed to fetch statistics:', err)
     error.value = 'Failed to load statistics. Please try again.'
-    // Mock data for testing/development
     stats.value = {
-      dailyTotal: 50,
-      sevenDayAverage: 45.2,
-      currentStreak: 12,
-      thirtyDayAverage: 42.8,
-      allTimeStats: {
-        totalPushups: 5432
-      }
+      dailyTotal: { total: 50 },
+      sevenDayAverage: { average: 45.2 },
+      currentStreak: { currentStreak: 12 },
+      thirtyDayAverage: { average: 42.8 },
+      allTimeStats: { totalPushups: 5432 },
+      avgPerSession: { avgPerSession: 0 },
+      avgPerSet: { avgPerSet: 0 }
     }
   } finally {
     loading.value = false
@@ -48,12 +45,10 @@ const fetchStats = async () => {
 const showRefreshFeedback = () => {
   refreshFeedback.value = '✅ Updated!'
 
-  // Clear existing timer if any
   if (refreshFeedbackTimer.value) {
     clearTimeout(refreshFeedbackTimer.value)
   }
 
-  // Auto-hide after 2 seconds
   refreshFeedbackTimer.value = setTimeout(() => {
     refreshFeedback.value = ''
   }, 2000)
@@ -72,7 +67,6 @@ const refreshStats = async () => {
     console.error('Failed to refresh statistics:', err)
     error.value = 'Failed to refresh statistics.'
 
-    // Auto-hide error after 5 seconds
     setTimeout(() => {
       error.value = null
     }, 5000)
@@ -81,17 +75,14 @@ const refreshStats = async () => {
   }
 }
 
-// Fetch stats on mount
 onMounted(() => {
   fetchStats()
 })
 
-// Expose refreshStats for parent component
 defineExpose({
   refreshStats
 })
 
-// Cleanup timer on unmount
 onBeforeUnmount(() => {
   if (refreshFeedbackTimer.value) {
     clearTimeout(refreshFeedbackTimer.value)
@@ -116,70 +107,60 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="i in 6" :key="i" class="bg-slate-800 rounded-lg p-6 animate-pulse">
+    <div v-if="loading" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div v-for="i in 2" :key="i" class="bg-slate-800 rounded-lg p-6 animate-pulse">
         <div class="h-4 bg-slate-700 rounded w-1/3 mb-3"></div>
         <div class="h-8 bg-slate-700 rounded w-1/2"></div>
       </div>
     </div>
 
-    <!-- Stats Grid -->
-    <div v-else-if="stats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <!-- Avg Per Set -->
-      <StatCard
-        title="Avg Per Set"
-        :value="stats.avgPerSet?.avgPerSet ?? 0"
-        unit="pushups"
-        icon="💪"
-      />
+    <!-- Stats Grid: 2 Cards -->
+    <div v-else-if="stats" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Averages Card -->
+      <div class="bg-gradient-to-br from-blue-900 to-blue-800 rounded-lg p-6 shadow-lg border border-blue-700">
+        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          📈 Averages
+        </h3>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center pb-2 border-b border-blue-700">
+            <span class="text-blue-200 text-sm">Avg per Set</span>
+            <span class="text-white font-semibold">{{ formatNumber(stats.avgPerSet?.avgPerSet ?? 0) }}</span>
+          </div>
+          <div class="flex justify-between items-center pb-2 border-b border-blue-700">
+            <span class="text-blue-200 text-sm">Avg per Session</span>
+            <span class="text-white font-semibold">{{ formatNumber(stats.avgPerSession?.avgPerSession ?? 0) }}</span>
+          </div>
+          <div class="flex justify-between items-center pb-2 border-b border-blue-700">
+            <span class="text-blue-200 text-sm">7-Day Average</span>
+            <span class="text-white font-semibold">{{ formatNumber(stats.sevenDayAverage?.average ?? 0) }}</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-blue-200 text-sm">30-Day Average</span>
+            <span class="text-white font-semibold">{{ formatNumber(stats.thirtyDayAverage?.average ?? 0) }}</span>
+          </div>
+        </div>
+      </div>
 
-      <!-- Avg Per Session -->
-      <StatCard
-        title="Avg Per Session"
-        :value="stats.avgPerSession?.avgPerSession ?? 0"
-        unit="pushups"
-        icon="🎯"
-      />
-
-      <!-- Daily Total -->
-      <StatCard
-        title="Daily Total"
-        :value="formatNumber(stats.dailyTotal?.total ?? stats.dailyTotal)"
-        unit="pushups"
-        icon="📅"
-      />
-
-      <!-- 7-Day Average -->
-      <StatCard
-        title="7-Day Average"
-        :value="formatNumber(stats.sevenDayAverage?.average ?? stats.sevenDayAverage)"
-        unit="pushups/day"
-        icon="📈"
-      />
-
-      <!-- Current Streak -->
-      <StatCard
-        title="Current Streak"
-        :value="formatNumber(stats.currentStreak?.currentStreak ?? stats.currentStreak)"
-        unit="days"
-        icon="🔥"
-      />
-
-      <!-- 30-Day Average -->
-      <StatCard
-        title="30-Day Average"
-        :value="formatNumber(stats.thirtyDayAverage?.average ?? stats.thirtyDayAverage)"
-        unit="pushups/day"
-        icon="📊"
-      />
-
-      <!-- All-Time Total -->
-      <StatCard
-        title="All-Time Total"
-        :value="formatNumber(stats.allTimeStats?.totalPushups || 0)"
-        unit="pushups"
-        icon="🏆"
-      />
+      <!-- Totals Card -->
+      <div class="bg-gradient-to-br from-purple-900 to-purple-800 rounded-lg p-6 shadow-lg border border-purple-700">
+        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          🎯 Totals & Streaks
+        </h3>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center pb-2 border-b border-purple-700">
+            <span class="text-purple-200 text-sm">Today</span>
+            <span class="text-white font-semibold">{{ formatNumber(stats.dailyTotal?.total ?? stats.dailyTotal) }}</span>
+          </div>
+          <div class="flex justify-between items-center pb-2 border-b border-purple-700">
+            <span class="text-purple-200 text-sm">Current Streak</span>
+            <span class="text-white font-semibold">{{ formatNumber(stats.currentStreak?.currentStreak ?? stats.currentStreak) }} days</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-purple-200 text-sm">All-Time Total</span>
+            <span class="text-white font-semibold">{{ formatNumber(stats.allTimeStats?.totalPushups || 0) }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Empty State -->
