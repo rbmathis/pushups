@@ -56,40 +56,46 @@ Or manually copy changed files. Example frontend-only update:
 - `frontend/src/components/TrendsChart.vue`
 - `frontend/src/utils/sessionSettings.js`
 
-### 2. Delete images (required to pick up new code)
+### 2. Full clean rebuild (proven method)
 
-**⚠️ Important:** Stop/rebuild alone does NOT pick up new code changes.
-You must delete the old images first.
-
-1. Open **Container Manager** → **Image**
-2. **Delete** `pushup-tracker-frontend` image (and `pushup-tracker-backend` if backend changed)
-3. Then proceed to rebuild
-
-### 3. Rebuild and start
+**⚠️ Important:** This is the ONLY method that reliably picks up new code.
 
 1. Open **Container Manager** → **Project**
 2. Select `pushup-tracker`
-3. Click **Action** → **Build** (rebuilds from your updated files)
-4. Click **Action** → **Start**
-5. Wait for containers to start (watch the logs if needed)
+3. Click **Action** → **Stop** (wait for it to stop)
+4. Open **Container Manager** → **Container**
+5. **Delete each container** in the pushup-tracker project
+   - `pushup-tracker-backend`
+   - `pushup-tracker-frontend`
+   - `pushup-tracker-db` (if present)
+6. Open **Container Manager** → **Image**
+7. **Delete each image**:
+   - `pushup-tracker-frontend`
+   - `pushup-tracker-backend`
+8. Go back to **Container Manager** → **Project** → `pushup-tracker`
+9. Click **Action** → **Build** (rebuilds fresh images with new code)
+10. Click **Action** → **Start**
+11. Wait for containers to start (check logs to confirm)
+12. Hard refresh browser (`Ctrl+F5`) or test in incognito window
 
 ## If UI changes do not appear
 
-**⚠️ Do NOT use stop/rebuild alone - it does not pick up code changes.**
+**Use the full clean rebuild sequence (this ALWAYS works):**
 
-Use this proven sequence:
-
-1. Open **Container Manager** → **Image**
-2. **Delete** the old images:
+1. **Container Manager** → **Project** → `pushup-tracker` → **Action** → **Stop**
+2. **Container Manager** → **Container** → Delete all pushup-tracker containers:
+   - `pushup-tracker-backend`
    - `pushup-tracker-frontend`
-   - `pushup-tracker-backend` (if you changed backend code)
-3. Go to **Container Manager** → **Project** → `pushup-tracker`
-4. Click **Action** → **Build** (rebuilds fresh images with new code)
-5. Click **Action** → **Start**
-6. Wait for containers to start
+   - `pushup-tracker-db` (if present)
+3. **Container Manager** → **Image** → Delete all pushup-tracker images:
+   - `pushup-tracker-frontend`
+   - `pushup-tracker-backend`
+4. **Container Manager** → **Project** → `pushup-tracker` → **Action** → **Build**
+5. **Container Manager** → **Project** → `pushup-tracker` → **Action** → **Start**
+6. Wait for all containers to start (view logs to confirm)
 7. Hard refresh browser (`Ctrl+F5`) or test in incognito window
 
-This forces a clean rebuild and ensures new code is picked up.
+This completely removes cached layers and forces a clean rebuild with your new code.
 
 ## App endpoints
 
