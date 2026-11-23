@@ -6,24 +6,50 @@ A fitness tracking application for monitoring and logging pushup workouts.
 
 ```
 pushups/
-├── backend/           # Node.js/Express backend API
+├── backend/
+│   ├── src/
+│   │   ├── db/           # SQLite init, model, schema, migrations
+│   │   ├── routes/
+│   │   └── controllers/
+│   └── data/             # pushups.db (dev)
+├── frontend/
 │   └── src/
-│       ├── db/       # Database configuration and models
-│       ├── routes/   # API route handlers
-│       └── controllers/
-├── frontend/         # React/Vue frontend application
-│   └── src/
-│       ├── components/
-│       ├── pages/
-│       └── public/
-├── docker/           # Docker configuration
+│       ├── pages/        # Dashboard.vue, Session.vue
+│       └── components/   # QuickAddForm, StatsDashboard, charts, etc.
 ├── .gitignore
-└── README.md
+├── AGENTS.md
+├── SYNOLOGY_DEPLOY.md
+└── package.json
 ```
 
 ## Getting Started
 
-Development instructions coming soon.
+```bash
+# 1. Install dependencies
+npm run install:all
+
+# 2. Start dev servers (backend on :3001, frontend on :5173)
+npm start
+```
+
+See **AGENTS.md** for full architecture, commands, critical timezone rules, and contribution guidelines.
+
+### Development with historical data
+
+Run `npm run start:demo` from the repository root to start the frontend and a
+backend using a local copy of the NAS database snapshot in
+`backend/demo/pushups.db` (705 entries, captured November 23, 2026).
+The first run copies it to `backend/data/demo.db`; subsequent runs preserve
+that database and any changes you make. The normal `npm start` database is not
+changed. Stop an existing dev server first if it already uses ports 3001 or 5173.
+
+The snapshot contains actual workout history and is part of the repository;
+anyone with repository access can read it. It is not automatically refreshed
+from the NAS. To reset demo data, stop the demo server, move or delete
+`backend/data/demo.db` and its `-wal` and `-shm` sidecars, then run
+`npm run start:demo` again. This discards changes made in the demo database.
+Never use the destructive `backend/seed-data.js` script on a database you want
+to keep.
 
 ## Features
 
@@ -34,10 +60,10 @@ Development instructions coming soon.
 
 ## Technologies
 
-- **Backend**: Node.js, Express
-- **Frontend**: React/Vue
-- **Database**: SQLite/PostgreSQL
-- **Deployment**: Docker
+- **Backend**: Node.js, Express, SQLite3, date-fns-tz
+- **Frontend**: Vue 3, Vite, Tailwind CSS, vue-chartjs
+- **Database**: SQLite (WAL mode)
+- **Deployment**: Docker → Synology NAS (nginx proxy)
 
 ## License
 

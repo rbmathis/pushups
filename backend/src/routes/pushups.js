@@ -43,6 +43,14 @@ router.get("/history", pushupController.getHistory);
  */
 router.get("/timeofday", pushupController.getTimeOfDay);
 
+/**
+ * GET /api/dailycards
+ * Returns the three dashboard stat cards (Averages / Totals / Today)
+ * Query params: since (yyyy-MM-dd, default 2026-04-18)
+ * Response: {since, until, averages, totals, today}
+ */
+router.get("/dailycards", pushupController.getDailyCards);
+
 // ============ ADMIN ROUTES ============
 
 /**

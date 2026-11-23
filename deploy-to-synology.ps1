@@ -1,8 +1,8 @@
 # Pushup Tracker Deployment Script for Synology NAS
 # Dynamically finds changed files and copies them to Z:\pushup-tracker
 
-$sourceRoot = "C:\Users\rdpuser\Source\pushups"
-$destRoot = "Z:\pushup-tracker"
+$sourceRoot = (Resolve-Path $PSScriptRoot).Path
+$destRoot = if ($env:PUSHUP_NAS_ROOT) { $env:PUSHUP_NAS_ROOT } else { "Z:\pushup-tracker" }
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 
 Write-Host "🚀 Pushup Tracker Deployment to Synology NAS" -ForegroundColor Cyan
@@ -17,6 +17,17 @@ if (!(Test-Path $destRoot)) {
   Write-Host "❌ Error: $destRoot not found!" -ForegroundColor Red
   Write-Host "Make sure Synology NAS is mounted as Z: drive" -ForegroundColor Yellow
   exit 1
+}
+
+$dataRoot = Join-Path $destRoot "data"
+$backupRoot = Join-Path $destRoot "backups"
+if (!(Test-Path $dataRoot)) {
+  Write-Host "❌ Error: $dataRoot not found. Refusing to deploy without the persistent data directory." -ForegroundColor Red
+  exit 1
+}
+if (!(Test-Path $backupRoot)) {
+  Write-Host "⚠️  Creating missing backup directory: $backupRoot" -ForegroundColor Yellow
+  New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
 }
 
 # Get changed files from git (unstaged + staged)

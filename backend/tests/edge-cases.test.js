@@ -226,7 +226,7 @@ describe("Edge Cases", () => {
 
       const response = await request(app).get("/api/statistics").expect(200);
 
-      expect(response.body.sevenDayAverage.average).toBe(30);
+      expect(response.body.sevenDayAverage.average).toBe(12.86);
       expect(response.body.sevenDayAverage.daysWithPushups).toBe(3);
     });
 

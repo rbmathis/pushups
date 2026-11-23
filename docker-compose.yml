@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Backend API Server
   backend:
@@ -11,13 +9,18 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - /volume1/docker/pushup-tracker/data:/app/data
+      - ./data:/app/data
+      - ./backups:/app/backups
     environment:
       - NODE_ENV=production
       - PORT=3001
       - TZ=America/Chicago
+      - DB_PATH=/app/data/pushups.db
+      - DB_BACKUP_DIR=/app/backups
+      - DB_BACKUP_RETENTION=14
+      - DB_BACKUP_INTERVAL_HOURS=24
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/statistics"]
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -32,6 +35,7 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       - TZ=America/Chicago

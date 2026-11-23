@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-950 text-white p-6">
+  <div class="text-white py-4">
     <div class="max-w-6xl mx-auto">
       <!-- Header -->
       <div class="flex justify-between items-center mb-8">
@@ -7,7 +7,7 @@
       </div>
 
       <!-- Session Settings -->
-      <div class="bg-gray-900 rounded-lg p-6 mb-8 border border-gray-800">
+      <div class="bg-zinc-900/75 rounded-xl p-6 mb-8 border border-white/10 backdrop-blur-md">
         <h2 class="text-xl font-semibold mb-2">Session Controls</h2>
         <p class="text-sm text-gray-400 mb-4">
           Configure defaults for guided sessions on the dashboard.
@@ -91,7 +91,7 @@
             <button
               type="submit"
               :disabled="isSavingSessionConfig"
-              class="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded-lg font-semibold transition-colors"
+              class="px-5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 text-zinc-950 rounded-lg font-bold transition-all"
             >
               {{ isSavingSessionConfig ? 'Saving...' : 'Save Session Settings' }}
             </button>
@@ -99,7 +99,7 @@
               type="button"
               @click="resetSessionConfig"
               :disabled="isSavingSessionConfig"
-              class="px-5 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600 rounded-lg font-semibold transition-colors"
+              class="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-700 border border-white/10 rounded-lg font-semibold transition-colors"
             >
               Reset Defaults
             </button>

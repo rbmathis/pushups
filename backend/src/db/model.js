@@ -399,6 +399,201 @@ function getHistory(db, days = 30) {
   return get30DayHistory(db, days);
 }
 
+/**
+ * Build the three dashboard stat cards (Averages / Totals / Today)
+ * from daily totals on or after the tracking start date.
+ * @param {sqlite3.Database} db
+ * @param {string} [since] - inclusive start date, yyyy-MM-dd (default 2026-04-18)
+ * @returns {Promise<object>} card payload
+ */
+function getDailyCards(db, since = "2026-04-18") {
+  const start = new Date(since + "T00:00:00Z");
+  const end = new Date(getTodayDateString() + "T00:00:00Z");
+  const MS_PER_DAY = 86400000;
+  const round1 = (n) => Math.round(n * 10) / 10;
+
+  const query = `
+    SELECT
+      date(timestamp) as date,
+      SUM(count) as total,
+      SUM(CASE WHEN CAST(strftime('%H', timestamp) AS INTEGER) < 12 THEN count ELSE 0 END) as amTotal,
+      SUM(CASE WHEN CAST(strftime('%H', timestamp) AS INTEGER) >= 12 THEN count ELSE 0 END) as pmTotal
+    FROM pushups
+    WHERE date(timestamp) >= ?
+    GROUP BY date(timestamp)
+    ORDER BY date(timestamp) ASC
+  `;
+
+  return new Promise((resolve, reject) => {
+    db.all(query, [since], (err, rows) => {
+      if (err) {
+        reject(new Error(`Failed to get daily cards: ${err.message}`));
+        return;
+      }
+
+      const days = (rows || []).map((r) => ({
+        date: r.date,
+        total: r.total || 0,
+        am: r.amTotal || 0,
+        pm: r.pmTotal || 0,
+      }));
+
+      const total = days.reduce((sum, d) => sum + d.total, 0);
+      const am = days.reduce((sum, d) => sum + d.am, 0);
+      const pm = days.reduce((sum, d) => sum + d.pm, 0);
+
+      // Days on/off over the full tracking window (start date → today)
+      const spanDays = Math.floor((end - start) / MS_PER_DAY) + 1;
+      const activeDates = new Set(days.filter((d) => d.total > 0).map((d) => d.date));
+      const daysOn = Math.min(spanDays, activeDates.size);
+      const daysOff = Math.max(0, spanDays - activeDates.size);
+
+      // Averages
+      const avgPerDay = spanDays > 0 ? total / spanDays : 0;
+      const activeDays = days.filter((d) => d.total > 0);
+      const avgActiveDay = activeDays.length > 0 ? total / activeDays.length : 0;
+
+      // Sun–Sun weeks since the start date
+      const suns = Math.floor((start.getDay() + 6) % 7); // days to next Sunday
+      const weeksSinceStart = (end - start - suns * MS_PER_DAY) / (7 * MS_PER_DAY);
+      const avgPerWeek = weeksSinceStart > 0 ? total / weeksSinceStart : 0;
+
+      // Averages by calendar month (partial months count as-is), then averaged
+      const byMonth = new Map();
+      for (const d of days) {
+        const key = d.date.slice(0, 7);
+        const entry = byMonth.get(key) || { total: 0, days: 0, date: d.date };
+        entry.total += d.total;
+        entry.days += 1;
+        byMonth.set(key, entry);
+      }
+      let monthlyAvg = 0;
+      let monthlyLabel = "";
+      if (byMonth.size > 0) {
+        const monthAvgs = [];
+        byMonth.forEach((entry) => {
+          monthAvgs.push(entry.total / entry.days);
+          const label = new Date(entry.date + "T00:00:00Z").toLocaleDateString("en-US", {
+            month: "short",
+            year: "numeric",
+            timeZone: "UTC",
+          });
+          if (entry.total / entry.days >= monthlyAvg) {
+            monthlyAvg = entry.total / entry.days;
+            monthlyLabel = label;
+          }
+        });
+        monthlyAvg = monthAvgs.reduce((a, b) => a + b, 0) / monthAvgs.length;
+      }
+
+      // Best day and best Sun–Sun week
+      let bestDay = null;
+      for (const d of days) {
+        if (d.total > 0 && (!bestDay || d.total > bestDay.total)) {
+          bestDay = { total: d.total, date: d.date };
+        }
+      }
+
+      const byWeek = new Map(); // weekStart (Sunday, yyyy-MM-dd) -> { total, firstDate }
+      for (const d of days) {
+        if (d.total <= 0) continue;
+        const dt = new Date(d.date + "T00:00:00Z");
+        const weekStart = new Date(dt.getTime() - ((dt.getUTCDay() + 6) % 7) * MS_PER_DAY);
+        const key = formatInTimeZone(weekStart, "UTC", "yyyy-MM-dd");
+        const entry = byWeek.get(key) || { total: 0, firstDate: d.date };
+        entry.total += d.total;
+        byWeek.set(key, entry);
+      }
+      let bestWeek = null;
+      byWeek.forEach((entry, weekStart) => {
+        if (!bestWeek || entry.total > bestWeek.total) {
+          const end = new Date(new Date(weekStart + "T00:00:00Z").getTime() + 6 * MS_PER_DAY);
+          const fmt = (d) =>
+            d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+          bestWeek = {
+            total: entry.total,
+            weekStart,
+            weekEnd: formatInTimeZone(end, "UTC", "yyyy-MM-dd"),
+            label: `${fmt(new Date(weekStart + "T00:00:00Z"))} – ${fmt(end)}`,
+          };
+        }
+      });
+
+      // Milestones: last achieved and next up
+      const MILESTONES = [100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000];
+      let lastMilestone = null;
+      let nextMilestone = null;
+      for (const m of MILESTONES) {
+        if (total >= m) {
+          lastMilestone = m;
+        } else {
+          nextMilestone = m;
+          break;
+        }
+      }
+
+      // Today + current run since the last day off
+      const today = getTodayDateString();
+      const todayTotal = days.filter((d) => d.date === today).reduce((s, d) => s + d.total, 0);
+
+      // Current run: sum of all days after the most recent day off (within the window)
+      const totalsByDate = new Map(days.map((d) => [d.date, d.total]));
+      let lastOffDate = null;
+      for (let i = 0; i < spanDays; i++) {
+        const d = new Date(start.getTime() + i * MS_PER_DAY);
+        const key = formatInTimeZone(d, "UTC", "yyyy-MM-dd");
+        if (!totalsByDate.has(key) || totalsByDate.get(key) <= 0) {
+          lastOffDate = d;
+        }
+      }
+      const runStart = lastOffDate ? new Date(lastOffDate.getTime() + MS_PER_DAY) : start;
+      let sinceLastDayOff = 0;
+      let runDays = 0;
+      for (const d of days) {
+        const dt = new Date(d.date + "T00:00:00Z");
+        if (dt >= runStart && d.total > 0) {
+          sinceLastDayOff += d.total;
+          runDays += 1;
+        }
+      }
+
+      resolve({
+        since,
+        until: today,
+        averages: {
+          perDay: round1(avgPerDay),
+          perWeekSun: round1(avgPerWeek),
+          perActiveDay: round1(avgActiveDay),
+          perMonth: round1(monthlyAvg),
+          perMonthLabel: monthlyLabel,
+        },
+        totals: {
+          allTime: total,
+          daysOn,
+          daysOff,
+          am,
+          pm,
+        },
+        today: {
+          total: todayTotal,
+          sinceLastDayOff,
+          runDays,
+        },
+        bestDay,
+        bestWeek,
+        milestones: {
+          last: lastMilestone,
+          next: nextMilestone,
+          // Progress toward the next milestone: e.g. 2,603 / 5,000 = 52%.
+          progress: nextMilestone
+            ? Math.min(100, Math.round((total / nextMilestone) * 100))
+            : null,
+        },
+      });
+    });
+  });
+}
+
 // ============ ADMIN FUNCTIONS ============
 
 /**
@@ -801,6 +996,7 @@ module.exports = {
   updateEntry,
   deleteEntry,
   getTimeOfDay,
+  getDailyCards,
   getLifelinesEarned,
   countSessionsForDate,
   updateStreakForgiveness,

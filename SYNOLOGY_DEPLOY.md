@@ -9,12 +9,14 @@ No terminal/SSH steps are part of this process.
 
 - Project root: `/volume1/docker/pushup-tracker`
 - Data folder: `/volume1/docker/pushup-tracker/data`
+- Backup folder: `/volume1/docker/pushup-tracker/backups`
 
 ## Safety rules
 
 1. Never mirror-copy with delete options into the live project folder.
 2. Never remove or overwrite `/volume1/docker/pushup-tracker/data`.
-3. Copy only changed files from local machine to `Z:\pushup-tracker`.
+3. Never remove or overwrite `/volume1/docker/pushup-tracker/backups`.
+4. Copy only changed files from local machine to `Z:\pushup-tracker`.
 
 ## Expected project structure
 
@@ -23,7 +25,8 @@ No terminal/SSH steps are part of this process.
 ├── compose YAML file
 ├── backend/
 ├── frontend/
-└── data/
+├── data/       # persistent SQLite database
+└── backups/    # rolling online database backups
 ```
 
 ## First-time setup in Container Manager
@@ -56,7 +59,20 @@ Or manually copy changed files. Example frontend-only update:
 - `frontend/src/components/TrendsChart.vue`
 - `frontend/src/utils/sessionSettings.js`
 
-### 2. Full clean rebuild (proven method)
+### 2. Safe update workflow
+
+1. Check the backend log for a recent `Database backup created at ...` message.
+2. Stop the project and wait for both containers to stop.
+3. Run `deploy-to-synology.ps1`; it refuses to deploy if `data/` is missing.
+4. Build and start the project. Do not delete the `data/` or `backups/` folders.
+5. Confirm `http://<nas-ip>:3001/api/health` returns `{"status":"ok"}`.
+6. Confirm the dashboard still shows the expected history before considering the deployment complete.
+
+The backend creates an SQLite online-backup snapshot at startup and every 24 hours.
+It retains the newest 14 snapshots in `backups/`. This is safer than copying a
+live WAL-mode database file because SQLite completes the snapshot consistently.
+
+### 3. Full clean rebuild (only when needed)
 
 **⚠️ Important:** This is the ONLY method that reliably picks up new code.
 
@@ -114,6 +130,15 @@ Typical files:
 - `pushups.db-wal`
 - `pushups.db-shm`
 
+Backups are stored separately in:
+
+`/volume1/docker/pushup-tracker/backups/`
+
+To recover, stop the project, preserve the current `data/pushups.db`, copy the
+desired `backups/pushups-*.db` snapshot to `data/pushups.db`, remove any stale
+`pushups.db-wal` and `pushups.db-shm` files, then start the project and verify
+the history.
+
 ## UI troubleshooting
 
 1. If frontend shows `host not found in upstream "backend"`:
@@ -124,6 +149,7 @@ Typical files:
 
 ## Backup
 
-Back up this path:
+Back up both paths:
 
-`/volume1/docker/pushup-tracker/data/`
+- `/volume1/docker/pushup-tracker/data/`
+- `/volume1/docker/pushup-tracker/backups/`

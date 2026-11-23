@@ -47,19 +47,19 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-950 to-slate-900 py-8">
-    <div class="container mx-auto px-4">
+  <div class="py-4">
+    <div>
       <!-- Header -->
       <div class="mb-8">
-        <h1 class="text-4xl font-bold text-white mb-2">🏋️ Session Mode</h1>
-        <p class="text-gray-400">Structured workout with timed rest periods and progress tracking</p>
+        <h1 class="text-3xl font-bold text-white mb-2">🏋️ Session Mode</h1>
+        <p class="text-zinc-400">Structured workout with timed rest periods and progress tracking</p>
       </div>
 
       <!-- Main Layout -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Session Form (Left) -->
         <div class="lg:col-span-1">
-          <div class="bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg p-6 shadow-lg border border-slate-600 sticky top-6">
+          <div class="bg-zinc-900/80 rounded-2xl p-6 shadow-xl border border-amber-500/25 backdrop-blur-md sticky top-6">
             <PushupForm 
               ref="pushupFormRef"
               session-only 
@@ -81,27 +81,27 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Info Box -->
-      <div class="mt-12 bg-slate-800 border border-slate-700 rounded-lg p-6">
+      <div class="mt-12 bg-zinc-900/75 border border-white/10 rounded-xl p-6 backdrop-blur-md">
         <h3 class="text-lg font-semibold text-white mb-3">How Session Mode Works</h3>
-        <ul class="space-y-2 text-gray-300 text-sm">
+        <ul class="space-y-2 text-zinc-300 text-sm">
           <li class="flex gap-3">
-            <span class="text-blue-400 font-bold">1.</span>
+            <span class="text-amber-400 font-bold">1.</span>
             <span>Set your default reps and target number of sets</span>
           </li>
           <li class="flex gap-3">
-            <span class="text-blue-400 font-bold">2.</span>
+            <span class="text-amber-400 font-bold">2.</span>
             <span>Click "Start Session" to begin with a prep countdown</span>
           </li>
           <li class="flex gap-3">
-            <span class="text-blue-400 font-bold">3.</span>
+            <span class="text-amber-400 font-bold">3.</span>
             <span>Perform your set and log it when complete</span>
           </li>
           <li class="flex gap-3">
-            <span class="text-blue-400 font-bold">4.</span>
+            <span class="text-amber-400 font-bold">4.</span>
             <span>Rest with timed countdown (beeps in final 5 seconds)</span>
           </li>
           <li class="flex gap-3">
-            <span class="text-blue-400 font-bold">5.</span>
+            <span class="text-amber-400 font-bold">5.</span>
             <span>Watch progress update in real-time above</span>
           </li>
         </ul>

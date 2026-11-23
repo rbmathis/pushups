@@ -4,12 +4,27 @@ const path = require('path');
 require('dotenv').config();
 
 const { initializeDatabase } = require('./db/init');
+const { createDatabaseBackup } = require('./db/backup');
 const pushupRoutes = require('./routes/pushups');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'pushups.db');
+const DB_BACKUP_DIR = process.env.DB_BACKUP_DIR || path.join(__dirname, '..', 'backups');
+const configuredRetention = Number.parseInt(process.env.DB_BACKUP_RETENTION, 10);
+const configuredIntervalHours = Number.parseFloat(process.env.DB_BACKUP_INTERVAL_HOURS);
+const DB_BACKUP_RETENTION =
+  Number.isFinite(configuredRetention) && configuredRetention > 0
+    ? configuredRetention
+    : 14;
+const DB_BACKUP_INTERVAL =
+  (Number.isFinite(configuredIntervalHours) && configuredIntervalHours > 0
+    ? configuredIntervalHours
+    : 24) *
+  60 *
+  60 *
+  1000;
 const ERROR_LOGGING = process.env.ERROR_LOGGING === 'true';
 
 // CORS Configuration
@@ -42,6 +57,9 @@ app.use(express.json());
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  if (!app.locals.db) {
+    return res.status(503).json({ status: 'starting' });
+  }
   res.json({ status: 'ok' });
 });
 
@@ -114,10 +132,25 @@ app.use((err, req, res, next) => {
 
 // Start server
 async function startServer() {
+  let db;
   try {
-    const db = await initializeDatabase(DB_PATH);
+    db = await initializeDatabase(DB_PATH);
     app.locals.db = db;
     console.log(`Database initialized at ${DB_PATH}`);
+
+    const backupPath = await createDatabaseBackup(db, DB_BACKUP_DIR, {
+      retention: DB_BACKUP_RETENTION,
+    });
+    console.log(`Database backup created at ${backupPath}`);
+
+    const backupTimer = setInterval(() => {
+      createDatabaseBackup(db, DB_BACKUP_DIR, {
+        retention: DB_BACKUP_RETENTION,
+      })
+        .then((backupPath) => console.log(`Database backup created at ${backupPath}`))
+        .catch((error) => console.error(error.message));
+    }, DB_BACKUP_INTERVAL);
+    backupTimer.unref();
 
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
@@ -127,6 +160,7 @@ async function startServer() {
       }
     });
   } catch (error) {
+    if (db) db.close();
     console.error('Failed to start server:', error.message);
     process.exit(1);
   }

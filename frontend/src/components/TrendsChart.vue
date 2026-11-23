@@ -67,22 +67,26 @@ const buildDateRange = (startDate) => {
 }
 
 /**
- * Compute a linear regression trendline over y values.
+ * Compute a curved trendline using a centered moving average.
+ * Tracks the long-term shape of the daily totals instead of a straight line.
  * Returns an array of trendline y-values (same length as ys).
  */
-const linearTrendline = (ys) => {
+const movingAverageTrendline = (ys, window = 14) => {
   const n = ys.length
   if (n < 2) return ys.slice()
-  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0
-  for (let i = 0; i < n; i++) {
-    sumX += i
-    sumY += ys[i]
-    sumXY += i * ys[i]
-    sumXX += i * i
-  }
-  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX)
-  const intercept = (sumY - slope * sumX) / n
-  return ys.map((_, i) => Math.max(0, Math.round((slope * i + intercept) * 10) / 10))
+
+  const half = Math.max(1, Math.floor(window / 2))
+  return ys.map((_, i) => {
+    let sum = 0
+    let count = 0
+    for (let j = i - half; j <= i + half; j++) {
+      if (j >= 0 && j < n) {
+        sum += ys[j]
+        count++
+      }
+    }
+    return Math.max(0, Math.round((sum / count) * 10) / 10)
+  })
 }
 
 /**
@@ -105,7 +109,7 @@ const processHistoryData = (history) => {
     return null
   }
 
-  const trendData = linearTrendline(data)
+  const trendData = movingAverageTrendline(data)
 
   return {
     labels,
@@ -114,28 +118,36 @@ const processHistoryData = (history) => {
         label: 'Daily Total',
         data,
         sessions,
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(147, 197, 253, 0.1)',
-        borderWidth: 2,
+        borderColor: 'rgb(245, 158, 11)',
+        backgroundColor: (context) => {
+          const chart = context.chart
+          const { ctx, chartArea } = chart
+          if (!chartArea) return 'rgba(245, 158, 11, 0.18)'
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+          gradient.addColorStop(0, 'rgba(245, 158, 11, 0.35)')
+          gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)')
+          return gradient
+        },
+        borderWidth: 2.5,
         fill: true,
         tension: 0.4,
-        pointBackgroundColor: 'rgb(59, 130, 246)',
-        pointBorderColor: '#1e293b',
+        pointBackgroundColor: 'rgb(245, 158, 11)',
+        pointBorderColor: '#09090b',
         pointBorderWidth: 2,
-        pointRadius: 4,
+        pointRadius: 3.5,
         pointHoverRadius: 6,
-        pointHoverBackgroundColor: 'rgb(96, 165, 250)',
-        pointHoverBorderColor: '#0f172a'
+        pointHoverBackgroundColor: 'rgb(251, 191, 36)',
+        pointHoverBorderColor: '#09090b'
       },
       {
         label: 'Trend',
         data: trendData,
-        borderColor: 'rgba(251, 146, 60, 0.85)',
+        borderColor: 'rgba(244, 244, 245, 0.45)',
         backgroundColor: 'transparent',
         borderWidth: 2,
         borderDash: [6, 4],
         fill: false,
-        tension: 0,
+        tension: 0.3,
         pointRadius: 0,
         pointHoverRadius: 0
       }
@@ -310,13 +322,13 @@ const chartOptions = {
     <!-- Loading State -->
     <div
       v-if="loading"
-      class="bg-slate-800 rounded-lg p-6 border border-slate-700"
+      class="bg-zinc-900/75 rounded-xl p-6 border border-white/10 backdrop-blur-md"
     >
       <div class="flex items-center justify-center h-64">
         <div class="text-center">
           <div class="inline-block animate-spin mb-4">
             <svg
-              class="w-8 h-8 text-blue-400"
+              class="w-8 h-8 text-amber-400"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -336,7 +348,7 @@ const chartOptions = {
               ></path>
             </svg>
           </div>
-          <p class="text-slate-400">Loading chart...</p>
+          <p class="text-zinc-400">Loading chart...</p>
         </div>
       </div>
     </div>
@@ -344,13 +356,15 @@ const chartOptions = {
     <!-- Chart Container -->
     <div
       v-else-if="chartData"
-      class="bg-slate-800 rounded-lg p-6 border border-slate-700"
+      class="bg-zinc-900/75 rounded-xl p-6 border border-white/10 backdrop-blur-md"
     >
-      <div class="mb-4">
-        <h3 class="text-lg font-semibold text-white">
-          📈 Trend Since Apr 19
-        </h3>
-        <p class="text-sm text-slate-400 mt-1">Daily pushup totals since April 19</p>
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-bold text-white">
+            📈 Trend Since Apr 19
+          </h3>
+          <p class="text-xs text-zinc-400 mt-1">Daily pushup totals &amp; 14-day moving trend</p>
+        </div>
       </div>
 
       <!-- Chart -->
@@ -360,9 +374,9 @@ const chartOptions = {
     </div>
 
     <!-- Empty State -->
-    <div v-else class="bg-slate-800 rounded-lg p-6 border border-slate-700 text-center">
-      <p class="text-slate-400">No data available yet.</p>
-      <p class="text-sm text-slate-500 mt-2">Start logging pushups to see your trend!</p>
+    <div v-else class="bg-zinc-900/75 rounded-xl p-6 border border-white/10 text-center">
+      <p class="text-zinc-400">No data available yet.</p>
+      <p class="text-sm text-zinc-500 mt-2">Start logging pushups to see your trend!</p>
     </div>
   </div>
 </template>

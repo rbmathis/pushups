@@ -12,8 +12,8 @@ npm run install:all
 npm start                   # backend :3001, frontend :5173
 
 # Run separately
-npm run start:backend       # node src/server.js
-npm run start:frontend      # vite dev server
+npm run start:backend       # cd backend && npm start (node src/server.js)
+npm run start:frontend      # cd frontend && vite
 
 # Tests
 npm test                    # backend Jest tests with coverage
@@ -31,22 +31,30 @@ docker-compose up --build
 
 ```
 frontend/src/
-  pages/Dashboard.vue          ← orchestrator; owns refs to child components
+  pages/
+    Dashboard.vue              ← orchestrator; owns refs to child components + refresh logic
+    Session.vue
   components/
-    PushupForm.vue             ← emits 'pushups-logged' → Dashboard triggers refresh
+    QuickAddForm.vue           ← main logging form (replaces old PushupForm)
+    PushupForm.vue             ← session-based form (emits events)
     StatsDashboard.vue         ← exposes refreshStats()
     StatCard.vue
     TrendsChart.vue            ← exposes refresh(); fills all 30 days incl. zeros
     TimeOfDayChart.vue         ← exposes refresh(); donut by time block
+    SessionLinkBox.vue
 
 backend/src/
-  server.js                    ← Express app, DB init, CORS config
+  server.js                    ← Express app, DB init, CORS, error handling, health check
   routes/pushups.js            ← route definitions
   controllers/pushupController.js  ← request validation + response shaping
-  db/model.js                  ← all SQL queries
-  db/init.js                   ← DB open, PRAGMAs, schema, migrations
-  db/schema.sql
-  db/migrations/001-create-pushups.js
+  db/
+    model.js                   ← all SQL queries
+    init.js                    ← DB open, PRAGMAs, schema, migrations (3 migrations)
+    schema.sql
+    migrations/
+      001-create-pushups.js
+      002-add-session-tracking.js
+      003-add-streak-forgiveness.js
 ```
 
 All frontend API calls use relative `/api/*` paths — Vite proxies them to `:3001` in dev; Nginx proxies in production.
@@ -54,6 +62,7 @@ All frontend API calls use relative `/api/*` paths — Vite proxies them to `:30
 ## Database
 
 - **SQLite** at `backend/data/pushups.db` (dev) or `/volume1/docker/pushup-tracker/data/pushups.db` (Docker/NAS)
+- **SQLite backups** at `backend/backups/` (dev) or `/volume1/docker/pushup-tracker/backups/` (Docker/NAS); the backend creates online snapshots on startup and daily
 - Configurable via `DB_PATH` env var
 - WAL mode, foreign keys on
 - Two columns matter: `timestamp` (CST, no TZ suffix) and `created_at` (UTC)
@@ -90,7 +99,7 @@ All frontend API calls use relative `/api/*` paths — Vite proxies them to `:30
 ## Frontend Conventions
 
 - Components that fetch data expose a `refresh()` method via `defineExpose`
-- `Dashboard.vue` calls all child `refresh()` methods after a 500ms delay post-log
+- `Dashboard.vue` calls all child `refresh()` methods (with 500ms delay) after logging
 - Charts use **vue-chartjs** (`Line`, `Doughnut`) with **Chart.js 4**
 - Styles: **Tailwind CSS** utility classes only; dark slate palette (`slate-800`, `slate-700`)
 - No Vuex/Pinia — local `ref` state per component

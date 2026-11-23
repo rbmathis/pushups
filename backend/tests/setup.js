@@ -43,7 +43,7 @@ async function createTestDatabase() {
         )
       `;
 
-      db.run(schema, (err) => {
+      db.exec(schema, (err) => {
         if (err) {
           reject(err);
         } else {

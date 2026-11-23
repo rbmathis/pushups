@@ -360,6 +360,31 @@ async function getTimeOfDay(req, res, next) {
   }
 }
 
+/**
+ * Get the dashboard stat cards (Averages / Totals / Today)
+ * GET /api/dailycards
+ * Response: {since, until, averages, totals, today}
+ */
+async function getDailyCards(req, res, next) {
+  try {
+    const db = req.app.locals.db;
+    if (!db) {
+      return res.status(500).json({
+        error: "Internal server error",
+        status: 500,
+        details: "Database connection unavailable",
+      });
+    }
+
+    const since = req.query.since || "2026-04-18";
+    const cards = await model.getDailyCards(db, since);
+    res.status(200).json(cards);
+  } catch (error) {
+    console.error("Error getting daily cards:", error.message);
+    next(error);
+  }
+}
+
 // ============ ADMIN FUNCTIONS ============
 
 /**
@@ -543,6 +568,7 @@ module.exports = {
   getStatistics,
   getHistory,
   getTimeOfDay,
+  getDailyCards,
   getAllEntries,
   updateEntry,
   deleteEntry,

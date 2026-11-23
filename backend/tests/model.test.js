@@ -147,7 +147,7 @@ describe("Database Model", () => {
 
       const result = await model.get7DayAverage(db);
 
-      expect(result.average).toBe(50);
+      expect(result.average).toBe(7.14);
       expect(result.daysWithPushups).toBe(1);
     });
 
@@ -160,7 +160,7 @@ describe("Database Model", () => {
 
       const result = await model.get7DayAverage(db);
 
-      expect(result.average).toBe(30);
+      expect(result.average).toBe(12.86);
       expect(result.daysWithPushups).toBe(3);
       expect(result.totalPushups).toBe(90);
     });
@@ -188,7 +188,7 @@ describe("Database Model", () => {
 
       expect(result.totalPushups).toBe(100);
       expect(result.daysWithPushups).toBe(2);
-      expect(result.average).toBe(50); // 100 / 2
+      expect(result.average).toBe(14.29); // 100 / 7 days
     });
   });
 

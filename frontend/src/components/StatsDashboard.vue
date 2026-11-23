@@ -8,11 +8,33 @@ const error = ref(null)
 const refreshFeedback = ref('')
 const refreshFeedbackTimer = ref(null)
 
-const API_URL = '/api/statistics'
+const API_URL = '/api/dailycards'
 
 const formatNumber = (value) => {
   if (value === null || value === undefined) return 0
-  return Math.round(value)
+  return Number(value).toLocaleString('en-US', { maximumFractionDigits: 1 })
+}
+
+const amPercent = (totals) => {
+  const am = Number(totals?.am) || 0
+  const pm = Number(totals?.pm) || 0
+  const sum = am + pm
+  if (sum === 0) return 50
+  return Math.round((am / sum) * 100)
+}
+
+const pmPercent = (totals) => 100 - amPercent(totals)
+
+const formatShortDate = (dateString) => {
+  try {
+    return new Date(dateString + 'T00:00:00Z').toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC'
+    })
+  } catch {
+    return dateString
+  }
 }
 
 const fetchStats = async () => {
@@ -29,14 +51,12 @@ const fetchStats = async () => {
     console.error('Failed to fetch statistics:', err)
     error.value = 'Failed to load statistics. Please try again.'
     stats.value = {
-      dailyTotal: { total: 50 },
-      sevenDayAverage: { average: 45.2 },
-      currentStreak: { currentStreak: 12 },
-      thirtyDayAverage: { average: 42.8 },
-      allTimeStats: { totalPushups: 5432 },
-      avgPerSession: { avgPerSession: 0 },
-      avgPerSet: { avgPerSet: 0 },
-      lifelinesEarned: 0
+      averages: { perDay: 12, perWeekSun: 84, perActiveDay: 30, perMonth: 12, perMonthLabel: 'May 2026' },
+      totals: { allTime: 5432, daysOn: 42, daysOff: 32, am: 3000, pm: 2432 },
+      today: { total: 50, sinceLastDayOff: 140, runDays: 3 },
+      bestDay: { total: 160, date: '2026-05-05' },
+      bestWeek: { total: 847, label: 'May 3 – May 9' },
+      milestones: { last: 5000, next: 10000, progress: 8 }
     }
   } finally {
     loading.value = false
@@ -108,64 +128,131 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div v-for="i in 2" :key="i" class="bg-slate-800 rounded-lg p-6 animate-pulse">
-        <div class="h-4 bg-slate-700 rounded w-1/3 mb-3"></div>
-        <div class="h-8 bg-slate-700 rounded w-1/2"></div>
+    <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div v-for="i in 4" :key="i" class="bg-zinc-900/70 border border-white/10 rounded-xl p-5 animate-pulse">
+        <div class="h-4 bg-zinc-800 rounded w-1/3 mb-4"></div>
+        <div class="h-7 bg-zinc-800 rounded w-1/2 mb-3"></div>
+        <div class="h-4 bg-zinc-800 rounded w-2/3"></div>
       </div>
     </div>
 
-    <!-- Stats Grid: 2 Cards -->
-    <div v-else-if="stats" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Averages Card -->
-      <div class="bg-gradient-to-br from-blue-900 to-blue-800 rounded-lg p-6 shadow-lg border border-blue-700">
-        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-          📈 Averages
-        </h3>
+    <!-- Stat Cards: Today / Totals / Averages / Highlights -->
+    <div v-else-if="stats" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <!-- Today (Hero Card) -->
+      <div class="bg-zinc-900/80 border border-amber-500/35 rounded-xl p-5 shadow-lg shadow-amber-500/5 backdrop-blur-md flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-amber-400 text-xs font-semibold uppercase tracking-wider">Today</h3>
+            <span class="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 text-amber-300 font-medium">
+              🔥 {{ formatNumber(stats.today?.runDays) }}d streak
+            </span>
+          </div>
+          <div class="mb-4">
+            <div class="text-4xl font-extrabold tracking-tight text-white">
+              {{ formatNumber(stats.today?.total) }}
+            </div>
+            <div class="text-xs text-zinc-400 mt-0.5">pushups logged today</div>
+          </div>
+        </div>
+        <div class="pt-3 border-t border-white/10 flex justify-between items-baseline text-sm">
+          <span class="text-zinc-400 text-xs">Since last day off</span>
+          <span class="text-white font-semibold">{{ formatNumber(stats.today?.sinceLastDayOff) }}</span>
+        </div>
+      </div>
+
+      <!-- Totals -->
+      <div class="bg-zinc-900/75 border border-white/10 rounded-xl p-5 backdrop-blur-md flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-amber-400 text-xs font-semibold uppercase tracking-wider">Totals</h3>
+            <span class="text-xs text-zinc-500">All time</span>
+          </div>
+          <div class="text-3xl font-extrabold tracking-tight text-white mb-4">
+            {{ formatNumber(stats.totals?.allTime) }}
+          </div>
+        </div>
         <div class="space-y-3">
-          <div class="flex justify-between items-center pb-2 border-b border-blue-700">
-            <span class="text-blue-200 text-sm">Avg per Set</span>
-            <span class="text-white font-semibold">{{ formatNumber(stats.avgPerSet?.avgPerSet ?? 0) }}</span>
+          <div>
+            <div class="flex justify-between text-xs mb-1.5">
+              <span class="text-zinc-400">AM / PM</span>
+              <span class="text-zinc-200 font-medium">
+                {{ formatNumber(stats.totals?.am) }} / {{ formatNumber(stats.totals?.pm) }}
+              </span>
+            </div>
+            <div class="h-1.5 bg-zinc-800 rounded-full overflow-hidden flex">
+              <div class="h-full bg-amber-400" :style="{ width: amPercent(stats.totals) + '%' }"></div>
+              <div class="h-full bg-orange-600/70" :style="{ width: pmPercent(stats.totals) + '%' }"></div>
+            </div>
           </div>
-          <div class="flex justify-between items-center pb-2 border-b border-blue-700">
-            <span class="text-blue-200 text-sm">Avg per Session</span>
-            <span class="text-white font-semibold">{{ formatNumber(stats.avgPerSession?.avgPerSession ?? 0) }}</span>
-          </div>
-          <div class="flex justify-between items-center pb-2 border-b border-blue-700">
-            <span class="text-blue-200 text-sm">7-Day Average</span>
-            <span class="text-white font-semibold">{{ formatNumber(stats.sevenDayAverage?.average ?? 0) }}</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-blue-200 text-sm">30-Day Average</span>
-            <span class="text-white font-semibold">{{ formatNumber(stats.thirtyDayAverage?.average ?? 0) }}</span>
+          <div class="flex justify-between text-xs pt-1 border-t border-white/10">
+            <span class="text-emerald-400 font-semibold">{{ formatNumber(stats.totals?.daysOn) }} days on</span>
+            <span class="text-rose-400 font-semibold">{{ formatNumber(stats.totals?.daysOff) }} days off</span>
           </div>
         </div>
       </div>
 
-      <!-- Totals Card -->
-      <div class="bg-gradient-to-br from-purple-900 to-purple-800 rounded-lg p-6 shadow-lg border border-purple-700">
-        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-          🎯 Totals & Streaks
-        </h3>
-        <div class="space-y-3">
-          <div class="flex justify-between items-center pb-2 border-b border-purple-700">
-            <span class="text-purple-200 text-sm">Today</span>
-            <span class="text-white font-semibold">{{ formatNumber(stats.dailyTotal?.total ?? stats.dailyTotal) }}</span>
+      <!-- Averages -->
+      <div class="bg-zinc-900/75 border border-white/10 rounded-xl p-5 backdrop-blur-md">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-amber-400 text-xs font-semibold uppercase tracking-wider">Averages</h3>
+          <span class="text-xs text-zinc-500">{{ stats.averages?.perMonthLabel || '—' }}</span>
+        </div>
+        <dl class="space-y-2.5 text-sm">
+          <div class="flex justify-between items-baseline">
+            <dt class="text-zinc-400 text-xs">Active Day</dt>
+            <dd class="text-lg font-bold text-white">{{ formatNumber(stats.averages?.perActiveDay) }}</dd>
           </div>
-          <div class="flex justify-between items-center pb-2 border-b border-purple-700">
-           <span class="text-purple-200 text-sm flex items-center gap-1">
-             Current Streak
-             <span v-if="stats.currentStreak?.forgivenessUsed" class="text-xs bg-yellow-600 px-2 py-0.5 rounded" title="Streak continued with forgiveness token">💛</span>
-           </span>
-           <span class="text-white font-semibold">{{ formatNumber(stats.currentStreak?.currentStreak ?? stats.currentStreak) }} days</span>
-         </div>
-         <div class="flex justify-between items-center pb-2 border-b border-purple-700">
-           <span class="text-purple-200 text-sm">Lifelines Earned 🛟</span>
-           <span class="text-white font-semibold">{{ formatNumber(stats.lifelinesEarned ?? 0) }}</span>
-         </div>
-         <div class="flex justify-between items-center">
-           <span class="text-purple-200 text-sm">All-Time Total</span>
-           <span class="text-white font-semibold">{{ formatNumber(stats.allTimeStats?.totalPushups || 0) }}</span>
+          <div class="flex justify-between items-baseline">
+            <dt class="text-zinc-400 text-xs">Per Day</dt>
+            <dd class="text-white font-semibold">{{ formatNumber(stats.averages?.perDay) }}</dd>
+          </div>
+          <div class="flex justify-between items-baseline">
+            <dt class="text-zinc-400 text-xs">Per Week (Sun–Sun)</dt>
+            <dd class="text-white font-semibold">{{ formatNumber(stats.averages?.perWeekSun) }}</dd>
+          </div>
+          <div class="flex justify-between items-baseline">
+            <dt class="text-zinc-400 text-xs">Per Month</dt>
+            <dd class="text-white font-semibold">{{ formatNumber(stats.averages?.perMonth) }}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Highlights -->
+      <div class="bg-zinc-900/75 border border-white/10 rounded-xl p-5 backdrop-blur-md flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-amber-400 text-xs font-semibold uppercase tracking-wider">Highlights</h3>
+            <span class="text-xs">🏆</span>
+          </div>
+          <dl class="space-y-2 text-sm mb-4">
+            <div class="flex justify-between items-baseline">
+              <dt class="text-zinc-400 text-xs">Best Day</dt>
+              <dd class="text-white font-semibold">
+                {{ formatNumber(stats.bestDay?.total) }}
+                <span class="text-xs text-zinc-400">({{ stats.bestDay ? formatShortDate(stats.bestDay.date) : '—' }})</span>
+              </dd>
+            </div>
+            <div class="flex justify-between items-baseline">
+              <dt class="text-zinc-400 text-xs">Best Week</dt>
+              <dd class="text-white font-semibold">
+                {{ formatNumber(stats.bestWeek?.total) }}
+                <span class="text-xs text-zinc-400">({{ stats.bestWeek?.label || '—' }})</span>
+              </dd>
+            </div>
+          </dl>
+        </div>
+        <div v-if="stats.milestones?.progress !== null && stats.milestones?.progress !== undefined" class="pt-3 border-t border-white/10">
+          <div class="flex justify-between text-xs mb-1.5">
+            <span class="text-zinc-400">
+              Next: <strong class="text-white">{{ formatNumber(stats.milestones?.next) || '—' }}</strong>
+            </span>
+            <span class="text-amber-400 font-bold">{{ stats.milestones.progress }}%</span>
+          </div>
+          <div class="h-2 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              class="h-full bg-gradient-to-r from-amber-500 to-orange-400 rounded-full transition-all duration-500"
+              :style="{ width: stats.milestones.progress + '%' }"
+            ></div>
           </div>
         </div>
       </div>
@@ -173,7 +260,7 @@ onBeforeUnmount(() => {
 
     <!-- Empty State -->
     <div v-else class="text-center py-12">
-      <p class="text-slate-400">No statistics available yet.</p>
+      <p class="text-zinc-400">No statistics available yet.</p>
     </div>
   </div>
 </template>
