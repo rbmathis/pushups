@@ -7,6 +7,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 
+# Install the health-check dependency before frequently changing source files.
+RUN apk add --no-cache curl
+
 # Copy application code
 COPY src/ ./src/
 
@@ -15,9 +18,6 @@ RUN mkdir -p /app/data
 
 # Expose port
 EXPOSE 3001
-
-# Health check
-RUN apk add --no-cache curl
 
 # Start the server
 CMD ["node", "src/server.js"]

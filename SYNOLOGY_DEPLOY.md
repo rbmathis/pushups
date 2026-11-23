@@ -1,155 +1,88 @@
-# Synology NAS Deployment Guide (UI-Only)
+# Synology NAS Deployment Guide
 
-## Scope
+The project is at `/volume1/docker/pushup-tracker` on the NAS, mapped as
+`Z:\pushup-tracker` on Windows. The database lives in its `data` directory;
+backups live in `backups`. Never delete or overwrite either directory during
+deployment. This workflow does not require SSH.
 
-This guide is strictly for **Container Manager UI** workflows.
-No terminal/SSH steps are part of this process.
+## Deploy an update
 
-## Required project location
+1. In Container Manager, confirm the **currently running** backend's data mount
+   points to `/volume1/docker/pushup-tracker/data`. Note the current history and
+   total in the app. If the mount points elsewhere, stop and locate the actual
+   database before proceeding.
+2. From the repository root, run:
 
-- Project root: `/volume1/docker/pushup-tracker`
-- Data folder: `/volume1/docker/pushup-tracker/data`
-- Backup folder: `/volume1/docker/pushup-tracker/backups`
+   ```powershell
+   .\deploy-to-synology.ps1
+   ```
 
-## Safety rules
+3. The script compares the tracked build inputs with the last
+   **operator-confirmed** release. If they match and the staged files and
+   compose file are unchanged, it exits without a backup or file copy. This
+   record is not proof of what is currently running: the script cannot inspect
+   containers or changes made in Container Manager.
+4. Follow the checklist in the script. In Container Manager, stop the
+   `pushup-tracker` project and ensure no other process is accessing its database.
+   Choose `C` to confirm and continue, or `Q` to quit. Keep the project stopped
+   until the backup and staging finish. The NAS compose file will be replaced
+   by the repository version; preserve any NAS-specific settings separately.
+5. The script copies the database and any WAL, SHM, and journal files to a new
+   timestamped folder under `backups`. It compares the copies with the source
+   and checks SQLite integrity on a **local temporary copy**. If backup or
+   verification fails, it stops without copying application files.
+6. After verification, the script stages only tracked build inputs under a new
+   `deployment-releases` folder and checks their hashes. It generates a compose
+   file pointing at those clean build contexts, saves the previous NAS compose
+   file in the release folder, and then replaces the NAS compose file. It never
+   removes old source files, images, databases, or backups.
+7. In Container Manager, update the project with the new NAS compose file and
+   review it. Confirm the backend data mount still points to
+   `/volume1/docker/pushup-tracker/data`. Build with caching enabled, then
+   recreate and start the project. Avoid the **Clean** action for routine
+   updates; do not remove images, data, backups, or volumes.
+8. Compare the image tags printed by the script with the running containers,
+   and compare each running container's image ID with its newly built image ID
+   in Container Manager. Check `http://<nas-ip>:3001/api/health`, the backend
+   logs, and the dashboard history and total. Investigate discrepancies before
+   logging more data. Choose `C` only after these checks, or `Q` to leave the
+   release pending. The script cannot perform the build, inspect containers, or
+   validate the running application.
 
-1. Never mirror-copy with delete options into the live project folder.
-2. Never remove or overwrite `/volume1/docker/pushup-tracker/data`.
-3. Never remove or overwrite `/volume1/docker/pushup-tracker/backups`.
-4. Copy only changed files from local machine to `Z:\pushup-tracker`.
+The script stages the current contents of Git-tracked build files, including
+uncommitted edits. Add new application files to Git before running it; untracked
+build files cause it to stop. Each service's image tag contains a hash of its
+source inputs, not an actual Docker image digest. A changed service gets a new
+tag; the other service keeps its tag. Docker may still attempt both builds,
+depending on Container Manager, but unchanged layers should be cached if the
+builder's cache is available. The dependency layers precede application source
+in both Dockerfiles. If they rebuild unexpectedly, inspect the build log for
+cache misses, a different builder, cache removal, changed manifests, or a
+changed base image; the cause of the last slow build is not yet known. Base
+images should still be refreshed periodically for security updates.
 
-## Expected project structure
+An interrupted or unconfirmed deployment is retried rather than treated as
+complete, including a new offline backup. Old release folders are retained
+and will consume space over time; review them manually before any cleanup.
+The older `backend/data` directory on the NAS is not the active mount in the
+current configuration but contains a separate database: do not delete it
+without investigating and preserving it.
 
-```text
-/volume1/docker/pushup-tracker/
-├── compose YAML file
-├── backend/
-├── frontend/
-├── data/       # persistent SQLite database
-└── backups/    # rolling online database backups
-```
+The stop confirmation is manual: the script cannot independently prove that
+all NAS database users are stopped. SQLite WAL databases must not be accessed
+simultaneously from different machines over the network share.
 
-## First-time setup in Container Manager
+## Restore
 
-1. Open **Container Manager**.
-2. Open **Project**.
-3. Click **Create**.
-4. Set:
-   - Project name: `pushup-tracker`
-   - Path: `/volume1/docker/pushup-tracker`
-   - Source: existing compose YAML file in that folder
-5. Complete the wizard and start the project.
+Stop the project and preserve the current `data` directory before restoring.
+A `pre-deploy-*` backup folder contains the database and whichever sidecars
+were present at backup time. Restore that set together into `data`, ensuring
+that sidecars left over from the newer database are not mixed with the restored
+set. Start the project and verify its history. Do not remove a WAL file from a
+live database.
 
-## Normal update workflow
-
-### 1. Copy changed files only
-
-Copy only files you changed into `Z:\pushup-tracker`.
-
-Use the `deploy-to-synology.ps1` script from the repo:
-```powershell
-cd C:\Users\rdpuser\Source\pushups
-.\deploy-to-synology.ps1
-```
-
-Or manually copy changed files. Example frontend-only update:
-
-- `frontend/src/components/PushupForm.vue`
-- `frontend/src/pages/Admin.vue`
-- `frontend/src/components/TrendsChart.vue`
-- `frontend/src/utils/sessionSettings.js`
-
-### 2. Safe update workflow
-
-1. Check the backend log for a recent `Database backup created at ...` message.
-2. Stop the project and wait for both containers to stop.
-3. Run `deploy-to-synology.ps1`; it refuses to deploy if `data/` is missing.
-4. Build and start the project. Do not delete the `data/` or `backups/` folders.
-5. Confirm `http://<nas-ip>:3001/api/health` returns `{"status":"ok"}`.
-6. Confirm the dashboard still shows the expected history before considering the deployment complete.
-
-The backend creates an SQLite online-backup snapshot at startup and every 24 hours.
-It retains the newest 14 snapshots in `backups/`. This is safer than copying a
-live WAL-mode database file because SQLite completes the snapshot consistently.
-
-### 3. Full clean rebuild (only when needed)
-
-**⚠️ Important:** This is the ONLY method that reliably picks up new code.
-
-1. Open **Container Manager** → **Project**
-2. Select `pushup-tracker`
-3. Click **Action** → **Stop** (wait for it to stop)
-4. Open **Container Manager** → **Container**
-5. **Delete each container** in the pushup-tracker project
-   - `pushup-tracker-backend`
-   - `pushup-tracker-frontend`
-   - `pushup-tracker-db` (if present)
-6. Open **Container Manager** → **Image**
-7. **Delete each image**:
-   - `pushup-tracker-frontend`
-   - `pushup-tracker-backend`
-8. Go back to **Container Manager** → **Project** → `pushup-tracker`
-9. Click **Action** → **Build** (rebuilds fresh images with new code)
-10. Click **Action** → **Start**
-11. Wait for containers to start (check logs to confirm)
-12. Hard refresh browser (`Ctrl+F5`) or test in incognito window
-
-## If UI changes do not appear
-
-**Use the full clean rebuild sequence (this ALWAYS works):**
-
-1. **Container Manager** → **Project** → `pushup-tracker` → **Action** → **Stop**
-2. **Container Manager** → **Container** → Delete all pushup-tracker containers:
-   - `pushup-tracker-backend`
-   - `pushup-tracker-frontend`
-   - `pushup-tracker-db` (if present)
-3. **Container Manager** → **Image** → Delete all pushup-tracker images:
-   - `pushup-tracker-frontend`
-   - `pushup-tracker-backend`
-4. **Container Manager** → **Project** → `pushup-tracker` → **Action** → **Build**
-5. **Container Manager** → **Project** → `pushup-tracker` → **Action** → **Start**
-6. Wait for all containers to start (view logs to confirm)
-7. Hard refresh browser (`Ctrl+F5`) or test in incognito window
-
-This completely removes cached layers and forces a clean rebuild with your new code.
-
-## App endpoints
-
-- Frontend: `http://<nas-ip>:8080`
-- API check: `http://<nas-ip>:3001/api/statistics`
-
-## Data persistence
-
-Database files are expected in:
-
-`/volume1/docker/pushup-tracker/data/`
-
-Typical files:
-
-- `pushups.db`
-- `pushups.db-wal`
-- `pushups.db-shm`
-
-Backups are stored separately in:
-
-`/volume1/docker/pushup-tracker/backups/`
-
-To recover, stop the project, preserve the current `data/pushups.db`, copy the
-desired `backups/pushups-*.db` snapshot to `data/pushups.db`, remove any stale
-`pushups.db-wal` and `pushups.db-shm` files, then start the project and verify
-the history.
-
-## UI troubleshooting
-
-1. If frontend shows `host not found in upstream "backend"`:
-   - Ensure backend service is running in the same project.
-   - Rebuild/restart backend, then frontend from Project UI.
-2. For logs:
-   - **Container Manager** → **Container** → select container → **Log**.
-
-## Backup
-
-Back up both paths:
-
-- `/volume1/docker/pushup-tracker/data/`
-- `/volume1/docker/pushup-tracker/backups/`
+The backend also creates online snapshots in `backups` after startup and daily,
+once the current backend has been deployed. These are not a substitute for the
+pre-deployment backup: the startup snapshot happens after initialization and
+migrations. Keep additional backups off the NAS and test restores periodically;
+copies on the same NAS do not protect against its failure.
