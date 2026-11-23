@@ -1,23 +1,10 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref } from 'vue'
 import Header from './components/Header.vue'
 import Dashboard from './pages/Dashboard.vue'
-import Session from './pages/Session.vue'
 import Admin from './pages/Admin.vue'
 
 const currentPage = ref('dashboard')
-
-const handleNavigateToSession = () => {
-  currentPage.value = 'session'
-}
-
-onMounted(() => {
-  window.addEventListener('navigate-to-session', handleNavigateToSession)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('navigate-to-session', handleNavigateToSession)
-})
 </script>
 
 <template>
@@ -34,13 +21,6 @@ onBeforeUnmount(() => {
 
       <!-- Navigation Buttons -->
       <div class="container mx-auto px-4 pt-4 flex justify-end gap-2">
-        <button
-          v-if="currentPage !== 'session'"
-          @click="currentPage = 'session'"
-          class="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-900/80 hover:bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white transition-colors"
-        >
-          🏋️ Session
-        </button>
         <button
           v-if="currentPage === 'dashboard'"
           @click="currentPage = 'admin'"
@@ -60,7 +40,6 @@ onBeforeUnmount(() => {
       <!-- Main Content -->
       <main class="container mx-auto px-4 py-4 flex-1">
         <Dashboard v-if="currentPage === 'dashboard'" />
-        <Session v-else-if="currentPage === 'session'" />
         <Admin v-else-if="currentPage === 'admin'" />
       </main>
 

@@ -6,109 +6,6 @@
         <h1 class="text-3xl font-bold">Admin Panel</h1>
       </div>
 
-      <!-- Session Settings -->
-      <div class="bg-zinc-900/75 rounded-xl p-6 mb-8 border border-white/10 backdrop-blur-md">
-        <h2 class="text-xl font-semibold mb-2">Session Controls</h2>
-        <p class="text-sm text-gray-400 mb-4">
-          Configure defaults for guided sessions on the dashboard.
-        </p>
-        <form @submit.prevent="saveSessionConfig" class="space-y-4">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label for="admin-session-default-reps" class="block text-sm text-gray-400 mb-1">Default Reps</label>
-              <input
-                id="admin-session-default-reps"
-                v-model.number="sessionConfig.defaultReps"
-                type="number"
-                min="1"
-                max="1000"
-                required
-                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label for="admin-session-set-target" class="block text-sm text-gray-400 mb-1">Set Target</label>
-              <input
-                id="admin-session-set-target"
-                v-model.number="sessionConfig.setTarget"
-                type="number"
-                min="1"
-                max="50"
-                required
-                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label for="admin-session-prep-seconds" class="block text-sm text-gray-400 mb-1">Prep Countdown (sec)</label>
-              <input
-                id="admin-session-prep-seconds"
-                v-model.number="sessionConfig.prepSeconds"
-                type="number"
-                min="1"
-                max="30"
-                required
-                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label for="admin-session-rest-seconds" class="block text-sm text-gray-400 mb-1">Rest Timer (sec)</label>
-              <input
-                id="admin-session-rest-seconds"
-                v-model.number="sessionConfig.restSeconds"
-                type="number"
-                min="5"
-                max="300"
-                required
-                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label for="admin-session-tick-bpm" class="block text-sm text-gray-400 mb-1">Tick Tempo (BPM)</label>
-              <input
-                id="admin-session-tick-bpm"
-                v-model.number="sessionConfig.tickBpm"
-                type="number"
-                min="30"
-                max="200"
-                required
-                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div class="flex items-end">
-              <label class="inline-flex items-center gap-2 text-sm text-gray-300">
-                <input
-                  id="admin-session-sound-enabled"
-                  v-model="sessionConfig.soundEnabled"
-                  type="checkbox"
-                  class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500"
-                />
-                Enable session sounds
-              </label>
-            </div>
-          </div>
-
-          <div class="flex gap-3">
-            <button
-              type="submit"
-              :disabled="isSavingSessionConfig"
-              class="px-5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 text-zinc-950 rounded-lg font-bold transition-all"
-            >
-              {{ isSavingSessionConfig ? 'Saving...' : 'Save Session Settings' }}
-            </button>
-            <button
-              type="button"
-              @click="resetSessionConfig"
-              :disabled="isSavingSessionConfig"
-              class="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-700 border border-white/10 rounded-lg font-semibold transition-colors"
-            >
-              Reset Defaults
-            </button>
-          </div>
-        </form>
-        <p v-if="sessionConfigError" class="mt-2 text-red-400 text-sm">{{ sessionConfigError }}</p>
-        <p v-if="sessionConfigSuccess" class="mt-2 text-green-400 text-sm">{{ sessionConfigSuccess }}</p>
-      </div>
-
       <!-- Add New Entry Form -->
       <div class="bg-gray-900 rounded-lg p-6 mb-8 border border-gray-800">
         <h2 class="text-xl font-semibold mb-4">Add New Entry</h2>
@@ -271,11 +168,6 @@
 <script>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import {
-  loadSessionSettings,
-  resetSessionSettings,
-  saveSessionSettings
-} from '../utils/sessionSettings'
 
 export default {
   name: 'AdminPage',
@@ -293,10 +185,6 @@ export default {
     const isAdding = ref(false)
     const addError = ref('')
     const addSuccess = ref('')
-    const sessionConfig = ref(loadSessionSettings())
-    const isSavingSessionConfig = ref(false)
-    const sessionConfigError = ref('')
-    const sessionConfigSuccess = ref('')
 
     // Edit state
     const editingId = ref(null)
@@ -305,53 +193,6 @@ export default {
 
     // Delete state
     const deletingId = ref(null)
-
-    const validateSessionConfig = (config) => {
-      if (!Number.isInteger(config.defaultReps) || config.defaultReps < 1 || config.defaultReps > 1000) {
-        return 'Default reps must be between 1 and 1000'
-      }
-      if (!Number.isInteger(config.setTarget) || config.setTarget < 1 || config.setTarget > 50) {
-        return 'Set target must be between 1 and 50'
-      }
-      if (!Number.isInteger(config.prepSeconds) || config.prepSeconds < 1 || config.prepSeconds > 30) {
-        return 'Prep countdown must be between 1 and 30 seconds'
-      }
-      if (!Number.isInteger(config.restSeconds) || config.restSeconds < 5 || config.restSeconds > 300) {
-        return 'Rest timer must be between 5 and 300 seconds'
-      }
-      if (!Number.isInteger(config.tickBpm) || config.tickBpm < 30 || config.tickBpm > 200) {
-        return 'Tick tempo must be between 30 and 200 BPM'
-      }
-      return ''
-    }
-
-    const saveSessionConfig = async () => {
-      sessionConfigError.value = ''
-      sessionConfigSuccess.value = ''
-
-      const validationError = validateSessionConfig(sessionConfig.value)
-      if (validationError) {
-        sessionConfigError.value = validationError
-        return
-      }
-
-      isSavingSessionConfig.value = true
-      try {
-        sessionConfig.value = saveSessionSettings(sessionConfig.value)
-        sessionConfigSuccess.value = 'Session settings saved.'
-      } catch (error) {
-        sessionConfigError.value = 'Failed to save session settings'
-      } finally {
-        isSavingSessionConfig.value = false
-      }
-    }
-
-    const resetSessionConfig = () => {
-      sessionConfigError.value = ''
-      sessionConfigSuccess.value = ''
-      sessionConfig.value = resetSessionSettings()
-      sessionConfigSuccess.value = 'Session settings reset to defaults.'
-    }
 
     const loadEntries = async () => {
       isLoading.value = true
@@ -459,7 +300,6 @@ export default {
     }
 
     onMounted(() => {
-      sessionConfig.value = loadSessionSettings()
       loadEntries()
     })
 
@@ -471,16 +311,10 @@ export default {
       isAdding,
       addError,
       addSuccess,
-      sessionConfig,
-      isSavingSessionConfig,
-      sessionConfigError,
-      sessionConfigSuccess,
       editingId,
       editForm,
       isSaving,
       deletingId,
-      saveSessionConfig,
-      resetSessionConfig,
       loadEntries,
       addEntry,
       startEdit,
